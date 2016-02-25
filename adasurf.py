@@ -40,7 +40,7 @@ def adasurf(points, config):
     r = leastsq(residuals, [1, 0.5, 1], args=(x1, y1, z1))
 
     # 打印结果，r[0]存储的是拟合的结果，r[1]、r[2]代表其他信息
-    return r[0], MSE(r[0], points)
+    return r[0], MSE(r[0], points), points
 
 def paint_surf(a, b, c, points=None):
     fig = pl.figure()
@@ -64,23 +64,27 @@ def paint_surf(a, b, c, points=None):
 def paint_surfs(surfs, points, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0), zlim=(-1.1, 1.1)):
     fig = pl.figure()
     ax = fig.add_subplot(111, projection='3d')
-    for ans in surfs:
+    for ans, surf_id in zip(surfs, range(len(surfs))):
         a, b, c = ans[0][0], ans[0][1], ans[0][2]
         X = np.arange(xlim[0], xlim[1], (xlim[1]-xlim[0])/100.0)
         Y = np.arange(ylim[0], ylim[1], (ylim[1]-ylim[0])/100.0)
         X, Y = np.meshgrid(X, Y)
         Z = -(X*a + Y*b + c)
         # ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-        ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
+        # fig.colorbar(s, shrink=0.5, aspect=5)
+        s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
+        x1 = ans[2][:, 0]
+        y1 = ans[2][:, 1]
+        z1 = ans[2][:, 2]
+        ax.scatter(x1, y1, z1, c='crkgmy'[surf_id])
 
     ax.set_zlim(zlim[0], zlim[1])
-    # ax.zaxis.set_major_locator(LinearLocator(10))
-    # ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-    # fig.colorbar(surf, shrink=0.5, aspect=5)
-    x1 = points[:, 0]
-    y1 = points[:, 1]
-    z1 = points[:, 2]
-    ax.scatter(x1, y1, z1, c='r')
+    ax.zaxis.set_major_locator(LinearLocator(10))
+    ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+    # x1 = points[:, 0]
+    # y1 = points[:, 1]
+    # z1 = points[:, 2]
+    # ax.scatter(x1, y1, z1, c='r')
     pl.show()
 
 def filterex(iterator, predicate):
@@ -116,7 +120,8 @@ def Pipecycle(iterable, predicate, roundclearup = None):
 def identifysurf(points, config):
     def same_surf(surf, point):
         # print abs(point[2]-config.surf_fun(point[0], point[1], surf[0])) , surf[1] * 100
-        return abs(point[2]-config.surf_fun(point[0], point[1], surf[0])) <= 0.5
+        e = abs(point[2]-config.surf_fun(point[0], point[1], surf[0]))
+        return e <= nstd, e
 
     def new_surf(partial_points):
         all_surf = []
@@ -129,10 +134,17 @@ def identifysurf(points, config):
             return True
 
     def judge_point(point):
-        for surf in surfs:
-            if same_surf(surf, point):
-                return True
-        return False
+        suitable_surfs = []
+        for surf, surf_id in zip(surfs, range(len(surfs))):
+            pre, e = same_surf(surf, point)
+            if pre:
+                suitable_surfs.append((surf, e, surf_id))
+        if len(suitable_surfs) > 0:
+            surf, _, surf_id = min(suitable_surfs, key=lambda x:x[1])
+            surfs[surf_id] = adasurf(np.vstack((surf[2],point)), config)
+            return True
+        else:
+            return False
 
     def point_normalize(points):
         points = np.array(points)
@@ -144,17 +156,23 @@ def identifysurf(points, config):
     surfs = []
 
     npoints = point_normalize(points)
+    nstd = np.std(npoints)
+    print 'nstd', nstd
     Pipecycle(npoints, judge_point, new_surf)
 
     return surfs, npoints
 
 if __name__ == '__main__':
-    c = np.loadtxt('1.py', comments='#')
+    c = np.loadtxt('2.py', comments='#')
     # ans, r = adasurf(c, AdaSurfConfig())
     # print ans, r, np.mean(c[:, 2]), np.std(c[:, 2])
 
+    import time
+    starttime = time.clock()
     surfs, npoints = identifysurf(c, AdaSurfConfig())
-    print len(surfs), surfs
+    print time.clock() - starttime
+
+    print len(surfs)
     xlim = (np.min(npoints[:, 0]), np.max(npoints[:, 0]))
     ylim = (np.min(npoints[:, 1]), np.max(npoints[:, 1]))
     zlim = (np.min(npoints[:, 2]), np.max(npoints[:, 2]))
