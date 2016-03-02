@@ -10,25 +10,19 @@ from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from itertools import *
 import collections
 from multiprocessing import Pool
-import random
+
 from scipy.optimize import leastsq
 
 class AdaSurfConfig:
     def __init__(self):
-        self.origin_points = 5
-        self.most_combination_points = 50
-        self.same_threshold = 0.5
+        self.origin_points = 4
 
     # 待拟合面的函数，x是变量，p是参数
     def surf_fun(self, x, y, params):
         a, b, c = params
         return -(a*x + b*y + c)
 
-ELAPSE_LSQ = 0
-ELAPSE_STD = 0
-
 def adasurf(points, config):
-    global ELAPSE_LSQ
     # 计算真实数据和拟合数据之间的误差，p是待拟合的参数，x和y分别是对应的真实数据
     def residuals(params, x, y, z, regularization = 0.0):
         rt = z - config.surf_fun(x, y, params)
@@ -44,12 +38,29 @@ def adasurf(points, config):
     z1 = points[:, 2]
 
     # 调用拟合函数，第一个参数是需要拟合的差值函数，第二个是拟合初始值，第三个是传入函数的其他参数
-    starttime = time.clock()
     r = leastsq(residuals, [1, 0.5, 1], args=(x1, y1, z1))
-    ELAPSE_LSQ += time.clock() - starttime
 
     # 打印结果，r[0]存储的是拟合的结果，r[1]、r[2]代表其他信息
     return r[0], MSE(r[0], points), points
+
+def paint_surf(a, b, c, points=None):
+    fig = pl.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    X = np.arange(-1, 1, 0.05)
+    Y = np.arange(-1, 1, 0.05)
+    X, Y = np.meshgrid(X, Y)
+    Z = -(X*a + Y*b + c)
+    surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+    ax.set_zlim(-1.01, 1.01)
+    ax.zaxis.set_major_locator(LinearLocator(10))
+    ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+    if points != None:
+        x1 = points[:, 0]
+        y1 = points[:, 1]
+        z1 = points[:, 2]
+        ax.scatter(x1, y1, z1, c='r')
+        pl.show()
 
 def paint_surfs(surfs, points, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0), zlim=(-1.1, 1.1)):
     fig = pl.figure()
@@ -66,12 +77,15 @@ def paint_surfs(surfs, points, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0), zlim=(-1.1, 1
         x1 = ans[2][:, 0]
         y1 = ans[2][:, 1]
         z1 = ans[2][:, 2]
-        # tan_color = np.ones((len(x1), len(y1))) * np.arctan2(len(surfs)) # c='crkgmycrkgmycrkgmycrkgmy'[surf_id]
-        ax.scatter(x1, y1, z1, c='crgkmycrgkmycrgkmy'[surf_id])
+        ax.scatter(x1, y1, z1, c='crkgmy'[surf_id])
 
     ax.set_zlim(zlim[0], zlim[1])
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+    # x1 = points[:, 0]
+    # y1 = points[:, 1]
+    # z1 = points[:, 2]
+    # ax.scatter(x1, y1, z1, c='r')
     pl.show()
 
 def filterex(iterator, predicate):
@@ -108,34 +122,20 @@ def identifysurf(points, config):
     def same_surf(surf, point):
         # print abs(point[2]-config.surf_fun(point[0], point[1], surf[0])) , surf[1] * 100
         e = abs(point[2]-config.surf_fun(point[0], point[1], surf[0]))
-        return e <= config.same_threshold * nstd, e
+        return e <= nstd, e
 
     def new_surf(partial_points):
-        global ELAPSE_STD
         all_surf = []
-        starttime = time.clock()
-        adaptive_rate = 1.0
-
-        while len(all_surf) == 0:
-            for circum in combinations(random.sample(partial_points, min(config.most_combination_points, len(partial_points))), config.origin_points):
-                # starttime_circum = time.clock()
-                # std_circum = np.std(np.array(circum))
-                # ELAPSE_STD += time.clock() - starttime_circum
-                if True or std_circum < config.same_threshold * nstd * adaptive_rate:
-                    generated_surf = adasurf(np.array(circum), config)
-                    if generated_surf[1] < config.same_threshold * nstd:
-                        all_surf.append(generated_surf)
-            print 'one_new', time.clock() - starttime, len(all_surf), adaptive_rate
-            if len(all_surf) > 0:
-                surfs.append(min(all_surf, key=lambda x:x[1]))
-                return False
-            else:
-                if len(partial_points) <= config.origin_points: # if there are less than points for next iteration, then return True
-                    return True
-                else:
-                    return True
-                    # adaptive_rate *= 2
-
+        pool = Pool(processes=3)
+        comb = combinations(partial_points, config.origin_points)
+        # for circum in pool.map(None, comb): # multithreading is deprecated here
+        for circum in comb:
+            all_surf.append(adasurf(np.array(circum), config))
+        if len(all_surf) > 0:
+            surfs.append(min(all_surf, key=lambda x:x[1]))
+            return False
+        elif len(partial_points) <= config.origin_points:
+            return True
 
     def judge_point(point):
         suitable_surfs = []
@@ -174,13 +174,35 @@ if __name__ == '__main__':
     import time
     starttime = time.clock()
     surfs, npoints = identifysurf(c, AdaSurfConfig())
-    print 'TOTAL: ', time.clock() - starttime
-    print "ELAPSE_LSQ: ", ELAPSE_LSQ
-    print "ELAPSE_STD: ", ELAPSE_STD
+    print time.clock() - starttime
 
     print len(surfs)
     xlim = (np.min(npoints[:, 0]), np.max(npoints[:, 0]))
     ylim = (np.min(npoints[:, 1]), np.max(npoints[:, 1]))
     zlim = (np.min(npoints[:, 2]), np.max(npoints[:, 2]))
 
-    paint_surfs(surfs, npoints, xlim, ylim, zlim)
+    # paint_surfs(surfs, npoints, xlim, ylim, zlim)
+
+
+
+    # def new_surf(partial_points):
+    #     all_surf = []
+    #     starttime = time.clock()
+    #     adaptive_rate = 1.0
+
+    #     while len(all_surf) == 0:
+    #         for circum in combinations(random.sample(partial_points, min(config.most_combination_points, len(partial_points))), config.origin_points):
+    #             if np.std(np.array(circum)) < config.same_threshold * nstd * adaptive_rate:
+    #                 generated_surf = adasurf(np.array(circum), config)
+    #                 if generated_surf[1] < config.same_threshold * nstd:
+    #                     all_surf.append(generated_surf)
+
+    #     print 'one_new', time.clock() - starttime, len(all_surf)
+    #     if len(all_surf) > 0:
+    #         surfs.append(min(all_surf, key=lambda x:x[1]))
+    #         return False
+    #     else:
+    #         if len(partial_points) <= config.origin_points: # if there are less than points for next iteration, then return True
+    #             return True
+    #         else:
+    #             return False
