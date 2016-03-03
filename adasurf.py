@@ -16,7 +16,7 @@ from scipy.optimize import leastsq
 class AdaSurfConfig:
     def __init__(self):
         self.origin_points = 5
-        self.most_combination_points = 50
+        self.most_combination_points = 35
         self.same_threshold = 0.5
 
     # 待拟合面的函数，x是变量，p是参数
@@ -89,12 +89,8 @@ def filterex(iterator, predicate):
     return dequeyes, dequeno
 
 def Pipecycle(iterable, predicate, roundclearup = None):
-    fucka = 1
+    prev = None
     while len(iterable) > 0:
-        fucka += 1
-        print len(iterable)
-        # if fucka > 10:
-        #     return
         fail = []
         for x in iterable:
             val = predicate(x)
@@ -103,6 +99,11 @@ def Pipecycle(iterable, predicate, roundclearup = None):
         iterable = np.array(fail)
         if roundclearup(iterable):
             return
+        print 'points remaining', len(iterable)
+        if prev == len(iterable):
+            return
+        else:
+            prev = len(iterable)
 
 def identifysurf(points, config):
     def same_surf(surf, point):
@@ -111,31 +112,38 @@ def identifysurf(points, config):
         return e <= config.same_threshold * nstd, e
 
     def new_surf(partial_points):
+        '''
+            return True: all points are fitted, Pipecycle quit loop
+            return False: Pipecycle should loop again and fit points
+        '''
         global ELAPSE_STD
         all_surf = []
         starttime = time.clock()
         adaptive_rate = 1.0
-
-        while len(all_surf) == 0:
-            for circum in combinations(random.sample(partial_points, min(config.most_combination_points, len(partial_points))), config.origin_points):
-                # starttime_circum = time.clock()
-                # std_circum = np.std(np.array(circum))
-                # ELAPSE_STD += time.clock() - starttime_circum
-                if True or std_circum < config.same_threshold * nstd * adaptive_rate:
-                    generated_surf = adasurf(np.array(circum), config)
-                    if generated_surf[1] < config.same_threshold * nstd:
-                        all_surf.append(generated_surf)
-            print 'one_new', time.clock() - starttime, len(all_surf), adaptive_rate
-            if len(all_surf) > 0:
-                surfs.append(min(all_surf, key=lambda x:x[1]))
-                return False
-            else:
-                if len(partial_points) <= config.origin_points: # if there are less than points for next iteration, then return True
-                    return True
+        
+        np.random.shuffle(partial_points[:])
+        for group_id in xrange(int(math.ceil(len(partial_points)*1.0/config.most_combination_points))):
+            while len(all_surf) == 0: # 如果始终不能生成新的面
+                # choices = random.sample(partial_points, min(config.most_combination_points, len(partial_points)))
+                choices = partial_points[group_id*config.most_combination_points:(group_id+1)*config.most_combination_points, :]
+                for circum in combinations(choices, config.origin_points):
+                    # 当取得的点的标准差小于总体的标准差才进行最小二乘拟合
+                    starttime_circum = time.clock()
+                    std_circum = np.std(np.array(circum))
+                    ELAPSE_STD += time.clock() - starttime_circum
+                    if std_circum < config.same_threshold * nstd * adaptive_rate:
+                        generated_surf = adasurf(np.array(circum), config)
+                        if generated_surf[1] < config.same_threshold * nstd:
+                            all_surf.append(generated_surf)
+                print 'new_surface: elapse', time.clock() - starttime, 'surface_count', len(all_surf), 'adaptive_rate', adaptive_rate
+                if len(all_surf) > 0: # 如果生成了若干新面
+                    surfs.append(min(all_surf, key=lambda x:x[1]))
+                    return False
                 else:
-                    return True
-                    # adaptive_rate *= 2
-
+                    if len(partial_points) <= config.origin_points: # 如果剩余的点数小于生成平面的基点数
+                        return True
+                    else: # 如果剩余的点数大于生成平面的基点数，说明是在标准差阶段卡住了，适当地提高标准差的限制，继续跑
+                        adaptive_rate *= 2
 
     def judge_point(point):
         suitable_surfs = []
@@ -167,16 +175,21 @@ def identifysurf(points, config):
     return surfs, npoints
 
 if __name__ == '__main__':
-    c = np.loadtxt('3.py', comments='#')
-    # ans, r = adasurf(c, AdaSurfConfig())
-    # print ans, r, np.mean(c[:, 2]), np.std(c[:, 2])
-
+    c = np.loadtxt('4.py', comments='#')
+    
     import time
     starttime = time.clock()
     surfs, npoints = identifysurf(c, AdaSurfConfig())
     print 'TOTAL: ', time.clock() - starttime
     print "ELAPSE_LSQ: ", ELAPSE_LSQ
     print "ELAPSE_STD: ", ELAPSE_STD
+    print "----------BELOW ARE SURFACES----------"
+    for s,i in zip(surfs, range(len(surfs))):
+        print "SURFACE ", i
+        print s[0]
+        print s[1]
+        print s[2]
+        print '**************************************'
 
     print len(surfs)
     xlim = (np.min(npoints[:, 0]), np.max(npoints[:, 0]))
