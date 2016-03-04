@@ -27,9 +27,15 @@ class AdaSurfConfig:
 ELAPSE_LSQ = 0
 ELAPSE_STD = 0
 
+def point_normalize(points):
+    points = np.array(points)
+    points[:, 0] = points[:, 0] - np.mean(points[:, 0])
+    points[:, 1] = points[:, 1] - np.mean(points[:, 1])
+    points[:, 2] = points[:, 2] - np.mean(points[:, 2])
+    return points
+
 def adasurf(points, config):
     global ELAPSE_LSQ
-    # 计算真实数据和拟合数据之间的误差，p是待拟合的参数，x和y分别是对应的真实数据
     def residuals(params, x, y, z, regularization = 0.0):
         rt = z - config.surf_fun(x, y, params)
         rt = np.append(rt, np.sqrt(regularization)*params)
@@ -43,15 +49,13 @@ def adasurf(points, config):
     y1 = points[:, 1]
     z1 = points[:, 2]
 
-    # 调用拟合函数，第一个参数是需要拟合的差值函数，第二个是拟合初始值，第三个是传入函数的其他参数
     starttime = time.clock()
     r = leastsq(residuals, [1, 0.5, 1], args=(x1, y1, z1))
     ELAPSE_LSQ += time.clock() - starttime
 
-    # 打印结果，r[0]存储的是拟合的结果，r[1]、r[2]代表其他信息
     return r[0], MSE(r[0], points), points
 
-def paint_surfs(surfs, points, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0), zlim=(-1.1, 1.1)):
+def paint_surfs(surfs, points, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0), zlim=(-1.1, 1.1), show = True):
     fig = pl.figure()
     ax = fig.add_subplot(111, projection='3d')
     for ans, surf_id in zip(surfs, range(len(surfs))):
@@ -72,21 +76,8 @@ def paint_surfs(surfs, points, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0), zlim=(-1.1, 1
     ax.set_zlim(zlim[0], zlim[1])
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-    pl.show()
-
-def filterex(iterator, predicate):
-    dequeyes = collections.deque()
-    dequeno = collections.deque()
-    try:
-        while True:
-            x = it.next()
-            if predicate(val):
-                dequeyes.append(x)
-            else:
-                dequeno.append(x)
-    except StopIteration:
-        pass
-    return dequeyes, dequeno
+    if show:
+        pl.show()
 
 def Pipecycle(iterable, predicate, roundclearup = None):
     prev = None
@@ -105,7 +96,7 @@ def Pipecycle(iterable, predicate, roundclearup = None):
         else:
             prev = len(iterable)
 
-def identifysurf(points, config):
+def identifysurf(points, config, donorm = True):
     def same_surf(surf, point):
         # print abs(point[2]-config.surf_fun(point[0], point[1], surf[0])) , surf[1] * 100
         e = abs(point[2]-config.surf_fun(point[0], point[1], surf[0]))
@@ -158,16 +149,12 @@ def identifysurf(points, config):
         else:
             return False
 
-    def point_normalize(points):
-        points = np.array(points)
-        points[:, 0] = points[:, 0] - np.mean(points[:, 0])
-        points[:, 1] = points[:, 1] - np.mean(points[:, 1])
-        points[:, 2] = points[:, 2] - np.mean(points[:, 2])
-        return points
-
     surfs = []
 
-    npoints = point_normalize(points)
+    if donorm:
+        npoints = point_normalize(points)
+    else:
+        npoints = points
     nstd = np.std(npoints)
     print 'nstd', nstd
     Pipecycle(npoints, judge_point, new_surf)
@@ -176,7 +163,7 @@ def identifysurf(points, config):
 
 if __name__ == '__main__':
     c = np.loadtxt('4.py', comments='#')
-    
+
     import time
     starttime = time.clock()
     surfs, npoints = identifysurf(c, AdaSurfConfig())
