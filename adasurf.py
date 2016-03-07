@@ -45,7 +45,9 @@ class AdaSurfConfig:
         self.most_combination_points = 20
         self.same_threshold = 0.5
         self.filter_rate = 0.01
-        self.ori_adarate = 1.0
+        self.ori_adarate = 0.5
+        self.step_adarate = 1.5
+        self.max_adarate = 1.5
         for dictionary in initial_data:
             for key in dictionary:
                 setattr(self, key, dictionary[key])
@@ -88,7 +90,7 @@ def adasurf(points, config):
 
     return r[0], MSE(r[0], points), points
 
-def Pipecycle(iterable, predicate, roundclearup = None):
+def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
     '''
         In this case:
             predicate -- judge_point
@@ -102,23 +104,24 @@ def Pipecycle(iterable, predicate, roundclearup = None):
                 fail.append(x)
         iterable = np.array(fail) # renew iterable
         if roundclearup(iterable):
-            return
-        print 'points remaining', len(iterable)
+            fail = clearing(fail)
+            return fail
+        print 'after adding a new surface, unfitted points remaining', len(iterable)
         assert prev != len(iterable)
         if prev == len(iterable):
+            # assert before return
             return
         else:
             prev = len(iterable)
 
 def identifysurf(points, config, donorm = True, surfs = []):
     def same_surf(surf, point):
-        # print abs(point[2]-config.surf_fun(point[0], point[1], surf[0])) , surf[1] * 100
         e = abs(point[2]-config.surf_fun(point[0], point[1], surf[0]))
         return e <= config.same_threshold * nstd, e
 
     def new_surf(partial_points):
         '''
-            return True: all points are fitted, Pipecycle quit loop
+            return True: all points are fitted, Pipecycle quit loop; or there's no fitting surface
             return False: Pipecycle should loop again and fit points
             dependencies: points
         '''
@@ -129,7 +132,8 @@ def identifysurf(points, config, donorm = True, surfs = []):
         adaptive_rate = config.ori_adarate
         
         np.random.shuffle(partial_points[:])
-        for group_id in xrange(int(math.ceil(len(partial_points)*1.0/config.most_combination_points))):
+        len_group = int(math.ceil(len(partial_points)*1.0/config.most_combination_points))
+        for group_id in xrange(len_group):
             while len(all_surf) == 0: # 如果始终不能生成新的面
                 # choices = random.sample(partial_points, min(config.most_combination_points, len(partial_points)))
                 choices = partial_points[group_id*config.most_combination_points:(group_id+1)*config.most_combination_points, :]
@@ -143,7 +147,7 @@ def identifysurf(points, config, donorm = True, surfs = []):
                         if generated_surf[1] < config.same_threshold * nstd:
                             # 这里generated_surf里面已经包含了生成的点，但是这些点还没有从npoints中被移除，所以结果里面点会变多
                             all_surf.append(generated_surf)
-                print 'new_surface: elapse', time.clock() - starttime, 'surface_count', len(all_surf), 'adaptive_rate', adaptive_rate, 'npartial_points', len(partial_points)
+                print 'try_new_surface: elapse', time.clock() - starttime,'group_id', group_id, '/', len_group, 'surface_count', len(all_surf), 'adaptive_rate', adaptive_rate, 'npartial_points', len(partial_points)
                 # print len(sorted(all_surf, reverse = True, cmp = lambda x,y: len(x[2]) > len(y[2]))[-1][2]), config.filter_rate * len(points)
                 # all_surf = filter(lambda x: len(x) > config.filter_rate * len(points), all_surf)
                 if len(all_surf) > 0: # 如果生成了若干新面
@@ -153,7 +157,14 @@ def identifysurf(points, config, donorm = True, surfs = []):
                     if len(partial_points) <= config.origin_points: # 如果剩余的点数小于生成平面的基点数
                         return True
                     else: # 如果剩余的点数大于生成平面的基点数，说明是在标准差阶段卡住了，适当地提高标准差的限制，继续跑
-                        adaptive_rate *= 2
+                        if adaptive_rate < config.max_adarate:
+                            if adaptive_rate * config.step_adarate < config.max_adarate:
+                                adaptive_rate *= config.step_adarate
+                            else:
+                                adaptive_rate = config.max_adarate * 1.01
+                        else: # adarate不能过大，否则就不精确了
+                            return True
+
 
     def judge_point(point):
         suitable_surfs = []
@@ -169,22 +180,37 @@ def identifysurf(points, config, donorm = True, surfs = []):
         else:
             return False
 
+    def remove_poor_support_surface(fail):
+        newfail = np.array([]).reshape(0, 3)
+        index_to_remove = []
+        for (surf, index) in zip(surfs, range(len(surfs))):
+            supporting = len(surf[2])
+            if supporting < 40: # config.filter_rate * len(points): # if this surface is poor supported
+                # remove the surf and add its supporting points back to fail
+                print "***drop one"
+                newfail = np.vstack((newfail, surf[2]))
+                index_to_remove.append(index)
+        for index in sorted(index_to_remove, reverse=True):
+            del surfs[index]
+        return np.vstack((fail, newfail))
+
     if donorm:
         npoints = point_normalize(points)
     else:
         npoints = points
-    nstd = np.std(npoints)
-    print 'nstd', nstd
-    Pipecycle(npoints, judge_point, new_surf)
 
-    return surfs, npoints
+    nstd = np.std(npoints)
+    print 'nstd of all points in this segment', nstd
+    fail = Pipecycle(npoints, judge_point, new_surf, remove_poor_support_surface)
+
+    return surfs, npoints, fail
 
 if __name__ == '__main__':
     c = np.loadtxt('5.py', comments='#')
 
     import time
     starttime = time.clock()
-    surfs, npoints = identifysurf(c, AdaSurfConfig())
+    surfs, npoints, _ = identifysurf(c, AdaSurfConfig())
     xlim = (np.min(npoints[:, 0]), np.max(npoints[:, 0]))
     ylim = (np.min(npoints[:, 1]), np.max(npoints[:, 1]))
     zlim = (np.min(npoints[:, 2]), np.max(npoints[:, 2]))
