@@ -24,12 +24,11 @@ def paint_surfs(surfs, points, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0), zlim=(-1.1, 1
         Y = np.arange(ylim[0], ylim[1], (ylim[1]-ylim[0])/100.0)
         X, Y = np.meshgrid(X, Y)
         Z = -(X*a + Y*b + c)
-        s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
+        # s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
         x1 = ans[2][:, 0]
         y1 = ans[2][:, 1]
         z1 = ans[2][:, 2]
-        # tan_color = np.ones((len(x1), len(y1))) * np.arctan2(len(surfs)) # c='crkgmycrkgmycrkgmycrkgmy'[surf_id]
-        # ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
+        ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
 
     ax.set_zlim(zlim[0], zlim[1])
     # ax.set_ylim(ylim[0], ylim[1])
@@ -48,6 +47,8 @@ class AdaSurfConfig:
         self.ori_adarate = 0.5
         self.step_adarate = 1.5
         self.max_adarate = 1.5
+        self.pointsame_threshold = 0.3
+
         for dictionary in initial_data:
             for key in dictionary:
                 setattr(self, key, dictionary[key])
@@ -117,7 +118,7 @@ def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
 def identifysurf(points, config, donorm = True, surfs = []):
     def same_surf(surf, point):
         e = abs(point[2]-config.surf_fun(point[0], point[1], surf[0]))
-        return e <= config.same_threshold * nstd, e
+        return e <= config.pointsame_threshold * nstd, e
 
     def new_surf(partial_points):
         '''
@@ -133,8 +134,8 @@ def identifysurf(points, config, donorm = True, surfs = []):
         
         np.random.shuffle(partial_points[:])
         len_group = int(math.ceil(len(partial_points)*1.0/config.most_combination_points))
-        for group_id in xrange(len_group):
-            while len(all_surf) == 0: # 如果始终不能生成新的面
+        while len(all_surf) == 0: # 如果始终不能生成新的面
+            for group_id in xrange(len_group):
                 # choices = random.sample(partial_points, min(config.most_combination_points, len(partial_points)))
                 choices = partial_points[group_id*config.most_combination_points:(group_id+1)*config.most_combination_points, :]
                 for circum in combinations(choices, config.origin_points):
@@ -142,28 +143,28 @@ def identifysurf(points, config, donorm = True, surfs = []):
                     starttime_circum = time.clock()
                     std_circum = np.std(np.array(circum))
                     ELAPSE_STD += time.clock() - starttime_circum
-                    if std_circum < config.same_threshold * nstd * adaptive_rate:
+                    if std_circum < config.same_threshold * nstd * adaptive_rate: # 如果方差满足要求
                         generated_surf = adasurf(np.array(circum), config)
                         if generated_surf[1] < config.same_threshold * nstd:
                             # 这里generated_surf里面已经包含了生成的点，但是这些点还没有从npoints中被移除，所以结果里面点会变多
                             all_surf.append(generated_surf)
                 print 'try_new_surface: elapse', time.clock() - starttime,'group_id', group_id, '/', len_group, 'surface_count', len(all_surf), 'adaptive_rate', adaptive_rate, 'npartial_points', len(partial_points)
-                # print len(sorted(all_surf, reverse = True, cmp = lambda x,y: len(x[2]) > len(y[2]))[-1][2]), config.filter_rate * len(points)
-                # all_surf = filter(lambda x: len(x) > config.filter_rate * len(points), all_surf)
-                if len(all_surf) > 0: # 如果生成了若干新面
-                    surfs.append(min(all_surf, key=lambda x:x[1]))
-                    return False
-                else:
-                    if len(partial_points) <= config.origin_points: # 如果剩余的点数小于生成平面的基点数
+            
+            if len(all_surf) > 0: # 如果生成了若干新面
+                surfs.append(min(all_surf, key=lambda x:x[1]))
+                return False
+            else:
+                if len(partial_points) <= config.origin_points: # 如果剩余的点数小于生成平面的基点数，这应该可以在之前判定的
+                    print 'less then happen'
+                    return True
+                else: # 如果剩余的点数大于生成平面的基点数，说明是在标准差阶段卡住了，适当地提高标准差的限制，继续跑
+                    if adaptive_rate < config.max_adarate:
+                        if adaptive_rate * config.step_adarate < config.max_adarate:
+                            adaptive_rate *= config.step_adarate
+                        else:
+                            adaptive_rate = config.max_adarate * 1.01
+                    else: # adarate不能过大，否则就不精确了
                         return True
-                    else: # 如果剩余的点数大于生成平面的基点数，说明是在标准差阶段卡住了，适当地提高标准差的限制，继续跑
-                        if adaptive_rate < config.max_adarate:
-                            if adaptive_rate * config.step_adarate < config.max_adarate:
-                                adaptive_rate *= config.step_adarate
-                            else:
-                                adaptive_rate = config.max_adarate * 1.01
-                        else: # adarate不能过大，否则就不精确了
-                            return True
 
 
     def judge_point(point):
@@ -183,16 +184,17 @@ def identifysurf(points, config, donorm = True, surfs = []):
     def remove_poor_support_surface(fail):
         newfail = np.array([]).reshape(0, 3)
         index_to_remove = []
+        print '***current dropping threshold is ', config.filter_rate * len(points)
         for (surf, index) in zip(surfs, range(len(surfs))):
             supporting = len(surf[2])
-            if supporting < 40: # config.filter_rate * len(points): # if this surface is poor supported
+            if supporting < config.filter_rate * len(points): # if this surface is poor supported
                 # remove the surf and add its supporting points back to fail
                 print "***drop one"
                 newfail = np.vstack((newfail, surf[2]))
                 index_to_remove.append(index)
         for index in sorted(index_to_remove, reverse=True):
             del surfs[index]
-        return np.vstack((fail, newfail))
+        return np.vstack((np.array(fail).reshape((-1, 3)), newfail.reshape((-1, 3))))
 
     if donorm:
         npoints = point_normalize(points)
