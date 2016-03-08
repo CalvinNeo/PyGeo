@@ -15,9 +15,12 @@ from scipy.optimize import leastsq
 import time
 
 
-def paint_surfs(surfs, points, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0), zlim=(-1.1, 1.1), show = True):
+def paint_surfs(surfs, points, show = True, title = ''):
     fig = pl.figure()
     ax = fig.add_subplot(111, projection='3d')
+    xlim = (np.min(points[:, 0]), np.max(points[:, 0]))
+    ylim = (np.min(points[:, 1]), np.max(points[:, 1]))
+    zlim = (np.min(points[:, 2]), np.max(points[:, 2]))
     for ans, surf_id in zip(surfs, range(len(surfs))):
         a, b, c = ans[0][0], ans[0][1], ans[0][2]
         X = np.arange(xlim[0], xlim[1], (xlim[1]-xlim[0])/100.0)
@@ -35,8 +38,10 @@ def paint_surfs(surfs, points, xlim=(-1.0, 1.0), ylim=(-1.0, 1.0), zlim=(-1.1, 1
     # ax.set_xlim(xlim[0], xlim[1])
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+    pl.title(title)
     if show:
         pl.show()
+    return fig
 
 class AdaSurfConfig:
     def __init__(self, *initial_data, **kwargs):
@@ -115,7 +120,7 @@ def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
         else:
             prev = len(iterable)
 
-def identifysurf(points, config, donorm = True, surfs = []):
+def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = False, title = ''):
     def same_surf(surf, point):
         e = abs(point[2]-config.surf_fun(point[0], point[1], surf[0]))
         return e <= config.pointsame_threshold * nstd, e
@@ -205,17 +210,18 @@ def identifysurf(points, config, donorm = True, surfs = []):
     print 'nstd of all points in this segment', nstd
     fail = Pipecycle(npoints, judge_point, new_surf, remove_poor_support_surface)
 
-    return surfs, npoints, fail
+    fig = None
+    if paint_when_end:
+        fig = paint_surfs(surfs, npoints, title = title, show = False)
+
+    return surfs, npoints, fail, (fig)
 
 if __name__ == '__main__':
     c = np.loadtxt('5.py', comments='#')
 
     import time
     starttime = time.clock()
-    surfs, npoints, _ = identifysurf(c, AdaSurfConfig())
-    xlim = (np.min(npoints[:, 0]), np.max(npoints[:, 0]))
-    ylim = (np.min(npoints[:, 1]), np.max(npoints[:, 1]))
-    zlim = (np.min(npoints[:, 2]), np.max(npoints[:, 2]))
+    surfs, npoints, _, _ = identifysurf(c, AdaSurfConfig())
     print 'TOTAL: ', time.clock() - starttime
     print "ELAPSE_LSQ: ", ELAPSE_LSQ
     print "ELAPSE_STD: ", ELAPSE_STD
@@ -235,4 +241,4 @@ if __name__ == '__main__':
     print len(surfs)
 
 
-    paint_surfs(surfs, npoints, xlim, ylim, zlim)
+    paint_surfs(surfs, npoints)

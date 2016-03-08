@@ -19,7 +19,7 @@ from adasurf import AdaSurfConfig, adasurf, paint_surfs, identifysurf, point_nor
 ELAPSE_SEG = 0
 class SurfSegConfig:
     def __init__(self):
-        self.slice_count = 10
+        self.slice_count = 8
         self.origin_points = 5
         self.most_combination_points = 25
         self.same_threshold = 0.5 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
@@ -30,7 +30,7 @@ class SurfSegConfig:
         self.pointsame_threshold = 0.5
         self.split_by_count = True
 
-def surf_segmentation(points, config):
+def surf_segmentation(points, config, paint_when_end = False):
     global ELAPSE_SEG
     config.slice_count = min(int(len(points) / config.origin_points), config.slice_count)
     assert len(points) / config.slice_count >= config.origin_points
@@ -44,6 +44,7 @@ def surf_segmentation(points, config):
         , 'pointsame_threshold': config.pointsame_threshold
         })
     surfs = []
+    slice_fig = []
     npoints = point_normalize(points)
     starttime = time.clock()
 
@@ -61,15 +62,6 @@ def surf_segmentation(points, config):
             if current_slot_count > step_count:
                 current_slot_count = 0
                 ptsetid += 1
-
-        # sorted_projection0_index = np.argsort(npoints[:, 0])
-        # current_slot_count, ptsetid = 0, 0
-        # for index in sorted_projection0_index:
-        #     pointsets[ptsetid] = np.vstack((pointsets[ptsetid], npoints[index]))
-        #     current_slot_count += 1
-        #     if current_slot_count > step_count:
-        #         current_slot_count = 0
-        #         ptsetid += 1
     else:
         projection0min, projection0max = np.min(projection0), np.max(projection0)
         step_len = (projection0max - projection0min) / config.slice_count
@@ -89,7 +81,9 @@ def surf_segmentation(points, config):
         allptfortest = np.vstack((ptset, np.array(fail)))
         print "len of surf is: ", len(partial_surfs), ", len of points is: ", len(allptfortest)
         if allptfortest != None and len(allptfortest) > 0 :
-            partial_surfs, _, fail = identifysurf(allptfortest, adasurconfig, donorm = False, surfs = partial_surfs)
+            partial_surfs, _, fail, extradata = identifysurf(allptfortest, adasurconfig, donorm = False, surfs = partial_surfs, title = str(ptsetindex), paint_when_end = paint_when_end)
+            if paint_when_end:
+                slice_fig.append(extradata[0])
         if fail == None:
             print "after segment", ptsetindex, "len of surf", len(partial_surfs), "fail is None", fail
         else:
@@ -109,7 +103,7 @@ def surf_segmentation(points, config):
     # ax.plot(x, y, z, c='g')
     # pl.show()
 
-    return surfs, npoints
+    return surfs, npoints, (slice_fig)
 
 if __name__ == '__main__':
     c = np.loadtxt('5.py', comments='#')
@@ -117,10 +111,8 @@ if __name__ == '__main__':
     print 'config', config.__dict__
     import time
     starttime = time.clock()
-    surfs, npoints = surf_segmentation(c, config)
-    xlim = (np.min(npoints[:, 0]), np.max(npoints[:, 0]))
-    ylim = (np.min(npoints[:, 1]), np.max(npoints[:, 1]))
-    zlim = (np.min(npoints[:, 2]), np.max(npoints[:, 2]))
+    surfs, npoints, extradata = surf_segmentation(c, config)
+
     print "----------BELOW ARE SURFACES---------- count:", len(surfs)
     print 'TOTAL: ', time.clock() - starttime
     print 'ELAPSE_SEG: ', ELAPSE_SEG
@@ -138,6 +130,8 @@ if __name__ == '__main__':
     for s,i in zip(surfs, range(len(surfs))):
         print "SURFACE ", i
         print s[2]
-    paint_surfs(surfs, npoints, xlim, ylim, zlim)
+    paint_surfs(surfs, npoints, 'all')
+    for slice_fig in extradata[0]:
+        slice_fig.show()
 
 
