@@ -100,6 +100,7 @@ def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
     '''
         In this case:
             predicate -- judge_point
+            rountclearup -- new_surf
     '''
     prev = None
     while len(iterable) > 0:
@@ -109,10 +110,10 @@ def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
             if not val:
                 fail.append(x)
         iterable = np.array(fail) # renew iterable
+        print 'before adding a new surface, unfitted points remaining', len(iterable)
         if roundclearup(iterable):
             fail = clearing(fail)
             return fail
-        print 'after adding a new surface, unfitted points remaining', len(iterable)
         assert prev != len(iterable)
         if prev == len(iterable):
             # assert before return
@@ -131,6 +132,10 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
             return False: Pipecycle should loop again and fit points
             dependencies: points
         '''
+        # renew surfs
+        for surf_id in xrange(len(surfs)):
+            surfs[surf_id] = adasurf(surfs[surf_id][2], config)
+
         global ELAPSE_STD
         all_surf = []
         import time
@@ -181,7 +186,7 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         if len(suitable_surfs) > 0:
             surf, _, surf_id = min(suitable_surfs, key=lambda x:x[1])
             # renew surf
-            surfs[surf_id] = adasurf(np.vstack((surf[2],point)), config)
+            # surfs[surf_id] = adasurf(np.vstack((surf[2], point)), config)
             return True
         else:
             return False
@@ -214,7 +219,7 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
     if paint_when_end:
         fig = paint_surfs(surfs, npoints, title = title, show = False)
 
-    return surfs, npoints, fail, (fig)
+    return surfs, npoints, fail, (fig, )
 
 if __name__ == '__main__':
     c = np.loadtxt('5.py', comments='#')

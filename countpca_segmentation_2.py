@@ -103,7 +103,7 @@ def surf_segmentation(points, config, paint_when_end = False):
     # ax.plot(x, y, z, c='g')
     # pl.show()
 
-    return surfs, npoints, (slice_fig)
+    return surfs, npoints, (slice_fig, )
 
 if __name__ == '__main__':
     c = np.loadtxt('5.py', comments='#')
@@ -111,7 +111,7 @@ if __name__ == '__main__':
     print 'config', config.__dict__
     import time
     starttime = time.clock()
-    surfs, npoints, extradata = surf_segmentation(c, config)
+    surfs, npoints, extradata = surf_segmentation(c, config, paint_when_end = True)
 
     print "----------BELOW ARE SURFACES---------- count:", len(surfs)
     print 'TOTAL: ', time.clock() - starttime
@@ -131,6 +131,7 @@ if __name__ == '__main__':
         print "SURFACE ", i
         print s[2]
     paint_surfs(surfs, npoints, 'all')
+    print extradata
     for slice_fig in extradata[0]:
         slice_fig.show()
 
