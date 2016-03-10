@@ -27,7 +27,7 @@ def paint_surfs(surfs, points, show = True, title = ''):
         Y = np.arange(ylim[0], ylim[1], (ylim[1]-ylim[0])/100.0)
         X, Y = np.meshgrid(X, Y)
         Z = -(X*a + Y*b + c)
-        # s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
+        s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
         x1 = ans[2][:, 0]
         y1 = ans[2][:, 1]
         z1 = ans[2][:, 2]
@@ -186,6 +186,7 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         if len(suitable_surfs) > 0:
             surf, _, surf_id = min(suitable_surfs, key=lambda x:x[1])
             # renew surf
+            surfs[surf_id] = (surf[0], surf[1], np.vstack((surf[2], point)))
             # surfs[surf_id] = adasurf(np.vstack((surf[2], point)), config)
             return True
         else:

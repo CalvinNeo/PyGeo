@@ -19,14 +19,14 @@ from adasurf import AdaSurfConfig, adasurf, paint_surfs, identifysurf, point_nor
 ELAPSE_SEG = 0
 class SurfSegConfig:
     def __init__(self):
-        self.slice_count = 8
-        self.origin_points = 5
+        self.slice_count = 10
+        self.origin_points = 6
         self.most_combination_points = 25
         self.same_threshold = 0.5 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
-        self.filter_rate = 0.01
+        self.filter_rate = 0.05
         self.ori_adarate = 0.5
         self.step_adarate = 1.5
-        self.max_adarate = 1.2
+        self.max_adarate = 1.1
         self.pointsame_threshold = 0.5
         self.split_by_count = True
 
@@ -77,7 +77,7 @@ def surf_segmentation(points, config, paint_when_end = False):
 
     for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
         print "--------------------------------------"
-        print "before segment", ptsetindex
+        print "before segment", ptsetindex, '/', len(pointsets)
         allptfortest = np.vstack((ptset, np.array(fail)))
         print "len of surf is: ", len(partial_surfs), ", len of points is: ", len(allptfortest)
         if allptfortest != None and len(allptfortest) > 0 :
@@ -111,7 +111,7 @@ if __name__ == '__main__':
     print 'config', config.__dict__
     import time
     starttime = time.clock()
-    surfs, npoints, extradata = surf_segmentation(c, config, paint_when_end = True)
+    surfs, npoints, extradata = surf_segmentation(c, config, paint_when_end = False)
 
     print "----------BELOW ARE SURFACES---------- count:", len(surfs)
     print 'TOTAL: ', time.clock() - starttime
