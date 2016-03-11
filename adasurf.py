@@ -31,7 +31,7 @@ def paint_surfs(surfs, points, show = True, title = ''):
         x1 = ans[2][:, 0]
         y1 = ans[2][:, 1]
         z1 = ans[2][:, 2]
-        ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
+        # ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
 
     ax.set_zlim(zlim[0], zlim[1])
     # ax.set_ylim(ylim[0], ylim[1])

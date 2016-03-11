@@ -20,13 +20,13 @@ ELAPSE_SEG = 0
 class SurfSegConfig:
     def __init__(self):
         self.slice_count = 10
-        self.origin_points = 6
-        self.most_combination_points = 25
+        self.origin_points = 5
+        self.most_combination_points = 20
         self.same_threshold = 0.5 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
         self.filter_rate = 0.05
         self.ori_adarate = 0.5
         self.step_adarate = 1.5
-        self.max_adarate = 1.1
+        self.max_adarate = 1.2
         self.pointsame_threshold = 0.5
         self.split_by_count = True
 
