@@ -14,6 +14,21 @@ import random
 from scipy.optimize import leastsq
 import time
 
+class Surface:
+    def __init__(self, *initial_data, **kwargs):
+        self.residuals = 0
+        self.points = np.array([]).reshape(0, 3)
+        self.args = np.array([1.0,1.0,1.0])
+        self.initial_points = np.array([]).reshape(0, 3)
+
+        def __str__(self):
+            return str(tuple(self.args, self.residuals, self.points, self.initial_points))
+
+        for dictionary in initial_data:
+            for key in dictionary:
+                setattr(self, key, dictionary[key])
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
 
 def paint_surfs(surfs, points, show = True, title = ''):
     fig = pl.figure()
@@ -22,16 +37,16 @@ def paint_surfs(surfs, points, show = True, title = ''):
     ylim = (np.min(points[:, 1]), np.max(points[:, 1]))
     zlim = (np.min(points[:, 2]), np.max(points[:, 2]))
     for ans, surf_id in zip(surfs, range(len(surfs))):
-        a, b, c = ans[0][0], ans[0][1], ans[0][2]
+        a, b, c = ans.args[0], ans.args[1], ans.args[2]
         X = np.arange(xlim[0], xlim[1], (xlim[1]-xlim[0])/100.0)
         Y = np.arange(ylim[0], ylim[1], (ylim[1]-ylim[0])/100.0)
         X, Y = np.meshgrid(X, Y)
         Z = -(X*a + Y*b + c)
-        s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
-        x1 = ans[2][:, 0]
-        y1 = ans[2][:, 1]
-        z1 = ans[2][:, 2]
-        # ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
+        # s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
+        x1 = ans.points[:, 0]
+        y1 = ans.points[:, 1]
+        z1 = ans.points[:, 2]
+        ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
 
     ax.set_zlim(zlim[0], zlim[1])
     # ax.set_ylim(ylim[0], ylim[1])
@@ -75,7 +90,7 @@ def point_normalize(points):
     points[:, 2] = points[:, 2] - np.mean(points[:, 2])
     return points
 
-def adasurf(points, config):
+def adasurf(points, config, initial_points = None):
     global ELAPSE_LSQ
     def residuals(params, x, y, z, regularization = 0.0):
         rt = z - config.surf_fun(x, y, params)
@@ -94,7 +109,7 @@ def adasurf(points, config):
     r = leastsq(residuals, [1, 0.5, 1], args=(x1, y1, z1))
     ELAPSE_LSQ += time.clock() - starttime
 
-    return r[0], MSE(r[0], points), points
+    return Surface(args = r[0], residuals = MSE(r[0], points), points = points, initial_points = initial_points)
 
 def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
     '''
@@ -114,7 +129,7 @@ def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
         if roundclearup(iterable):
             fail = clearing(fail)
             return fail
-        assert prev != len(iterable)
+        # assert prev != len(iterable)
         if prev == len(iterable):
             # assert before return
             return
@@ -123,7 +138,7 @@ def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
 
 def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = False, title = ''):
     def same_surf(surf, point):
-        e = abs(point[2]-config.surf_fun(point[0], point[1], surf[0]))
+        e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
         return e <= config.pointsame_threshold * nstd, e
 
     def new_surf(partial_points):
@@ -134,9 +149,10 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         '''
         # renew surfs
         for surf_id in xrange(len(surfs)):
-            surfs[surf_id] = adasurf(surfs[surf_id][2], config)
+            surfs[surf_id] = adasurf(surfs[surf_id].points, config)
 
         global ELAPSE_STD
+        TOP_MIN_STD = 99999
         all_surf = []
         import time
         starttime = time.clock()
@@ -146,22 +162,22 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         len_group = int(math.ceil(len(partial_points)*1.0/config.most_combination_points))
         while len(all_surf) == 0: # 如果始终不能生成新的面
             for group_id in xrange(len_group):
-                # choices = random.sample(partial_points, min(config.most_combination_points, len(partial_points)))
                 choices = partial_points[group_id*config.most_combination_points:(group_id+1)*config.most_combination_points, :]
                 for circum in combinations(choices, config.origin_points):
                     # 当取得的点的标准差小于总体的标准差才进行最小二乘拟合
                     starttime_circum = time.clock()
-                    std_circum = np.std(np.array(circum))
+                    std_circum = np.std(np.array(circum)[:, 1:-1])
+                    TOP_MIN_STD = min(TOP_MIN_STD, std_circum)
                     ELAPSE_STD += time.clock() - starttime_circum
                     if std_circum < config.same_threshold * nstd * adaptive_rate: # 如果方差满足要求
                         generated_surf = adasurf(np.array(circum), config)
-                        if generated_surf[1] < config.same_threshold * nstd:
+                        if generated_surf.residuals < config.same_threshold * nstd:
                             # 这里generated_surf里面已经包含了生成的点，但是这些点还没有从npoints中被移除，所以结果里面点会变多
                             all_surf.append(generated_surf)
                 print 'try_new_surface: elapse', time.clock() - starttime,'group_id', group_id, '/', len_group, 'surface_count', len(all_surf), 'adaptive_rate', adaptive_rate, 'npartial_points', len(partial_points)
             
             if len(all_surf) > 0: # 如果生成了若干新面
-                surfs.append(min(all_surf, key=lambda x:x[1]))
+                surfs.append(min(all_surf, key=lambda x:x.residuals))
                 return False
             else:
                 if len(partial_points) <= config.origin_points: # 如果剩余的点数小于生成平面的基点数，这应该可以在之前判定的
@@ -174,6 +190,7 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
                         else:
                             adaptive_rate = config.max_adarate * 1.01
                     else: # adarate不能过大，否则就不精确了
+                        print 'TOP_MIN_STD', TOP_MIN_STD, nstd
                         return True
 
 
@@ -185,8 +202,8 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
                 suitable_surfs.append((surf, e, surf_id))
         if len(suitable_surfs) > 0:
             surf, _, surf_id = min(suitable_surfs, key=lambda x:x[1])
-            # renew surf
-            surfs[surf_id] = (surf[0], surf[1], np.vstack((surf[2], point)))
+            # NO renew surf
+            surfs[surf_id] = Surface(args = surf.args, residuals = surf.residuals, points = np.vstack((surf.points, point)), initial_points = None)
             # surfs[surf_id] = adasurf(np.vstack((surf[2], point)), config)
             return True
         else:
@@ -197,11 +214,11 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         index_to_remove = []
         print '***current dropping threshold is ', config.filter_rate * len(points)
         for (surf, index) in zip(surfs, range(len(surfs))):
-            supporting = len(surf[2])
+            supporting = len(surf.points)
             if supporting < config.filter_rate * len(points): # if this surface is poor supported
                 # remove the surf and add its supporting points back to fail
                 print "***drop one"
-                newfail = np.vstack((newfail, surf[2]))
+                newfail = np.vstack((newfail, surf.points))
                 index_to_remove.append(index)
         for index in sorted(index_to_remove, reverse=True):
             del surfs[index]
@@ -212,8 +229,9 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
     else:
         npoints = points
 
-    nstd = np.std(npoints)
+    nstd = np.std(npoints[:, 1:-1])
     print 'nstd of all points in this segment', nstd
+    print 'len(surf)', len(surfs)
     fail = Pipecycle(npoints, judge_point, new_surf, remove_poor_support_surface)
 
     fig = None
@@ -238,9 +256,9 @@ if __name__ == '__main__':
     print "----------BELOW ARE SURFACES----------"
     for s,i in zip(surfs, range(len(surfs))):
         print "SURFACE ", i
-        print s[0] # surface args
-        print s[1] # MSE
-        print len(s[2])
+        print s.args # surface args
+        print s.residuals # MSE
+        print len(s.points)
         # print s[2] # npoints
         print '**************************************'
 

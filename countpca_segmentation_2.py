@@ -13,22 +13,41 @@ import collections
 from multiprocessing import Pool
 import random
 from scipy.optimize import leastsq
-from adasurf import AdaSurfConfig, adasurf, paint_surfs, identifysurf, point_normalize
+from adasurf import AdaSurfConfig, adasurf, paint_surfs, identifysurf, point_normalize, Surface
 
 
 ELAPSE_SEG = 0
 class SurfSegConfig:
     def __init__(self):
-        self.slice_count = 10
+        self.slice_count = 3
         self.origin_points = 5
-        self.most_combination_points = 20
-        self.same_threshold = 0.5 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
-        self.filter_rate = 0.05
-        self.ori_adarate = 0.5
-        self.step_adarate = 1.5
-        self.max_adarate = 1.2
+        self.most_combination_points = 30
+        self.same_threshold = 0.1 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
         self.pointsame_threshold = 0.5
+        self.filter_rate = 0.07
+        self.ori_adarate = 0.5
+        self.step_adarate = 1.4
+        self.max_adarate = 0.7
         self.split_by_count = True
+
+def paint_points(points, show = True, title = ''):
+    fig = pl.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    xlim = (np.min(points[:, 0]), np.max(points[:, 0]))
+    ylim = (np.min(points[:, 1]), np.max(points[:, 1]))
+    zlim = (np.min(points[:, 2]), np.max(points[:, 2]))
+    x1 = points[:, 0]
+    y1 = points[:, 1]
+    z1 = points[:, 2]
+    ax.scatter(x1, y1, z1, c='r')
+
+    ax.set_zlim(zlim[0], zlim[1])
+    ax.zaxis.set_major_locator(LinearLocator(10))
+    ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+    pl.title(title)
+    if show:
+        pl.show()
+    return fig
 
 def surf_segmentation(points, config, paint_when_end = False):
     global ELAPSE_SEG
@@ -49,15 +68,17 @@ def surf_segmentation(points, config, paint_when_end = False):
     starttime = time.clock()
 
     pca_md = mlab.PCA(np.copy(npoints))
-    projection0 = pca_md.Y[:, 0]
+    
 
+    # projection0 = pca_md.Y[:, 0]
+    projection0 = npoints[:, 0]
     if config.split_by_count:
         step_count = len(projection0) / config.slice_count
         pointsets = [np.array([]).reshape(0,3)] * config.slice_count
         sorted_projection0_index = np.argsort(projection0)
         current_slot_count, ptsetid = 0, 0
         for index in sorted_projection0_index:
-            pointsets[ptsetid] = np.vstack((pointsets[ptsetid], npoints[index]))
+            pointsets[ptsetid] = np.vstack((pointsets[ptsetid], npoints[index, :]))
             current_slot_count += 1
             if current_slot_count > step_count:
                 current_slot_count = 0
@@ -67,14 +88,16 @@ def surf_segmentation(points, config, paint_when_end = False):
         step_len = (projection0max - projection0min) / config.slice_count
         pointsets = [np.array([]).reshape(0,3)] * config.slice_count
         for i in xrange(len(projection0)):
-            if projection0[i] == projection0min:
+            if projection0[i] == projection0max:
                 ptsetid = config.slice_count - 1
             else:
                 ptsetid = int((projection0[i] - projection0min) / step_len)
-            pointsets[ptsetid] = np.vstack((pointsets[ptsetid], npoints[index]))
+            pointsets[ptsetid] = np.vstack((pointsets[ptsetid], npoints[i]))
 
     partial_surfs, fail = [], np.array([]).reshape(0,3)
-
+    for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
+        print "slice", len(ptset)
+        paint_points(ptset)
     for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
         print "--------------------------------------"
         print "before segment", ptsetindex, '/', len(pointsets)
@@ -111,7 +134,7 @@ if __name__ == '__main__':
     print 'config', config.__dict__
     import time
     starttime = time.clock()
-    surfs, npoints, extradata = surf_segmentation(c, config, paint_when_end = False)
+    surfs, npoints, extradata = surf_segmentation(c, config, paint_when_end = True)
 
     print "----------BELOW ARE SURFACES---------- count:", len(surfs)
     print 'TOTAL: ', time.clock() - starttime
@@ -119,17 +142,17 @@ if __name__ == '__main__':
     ALL_POINT = 0
     for s,i in zip(surfs, range(len(surfs))):
         print "SURFACE ", i
-        print s[0] # surface args
-        print s[1] # MSE
-        ALL_POINT += len(s[2])
-        print len(s[2])
+        print s.args # surface args
+        print s.residuals # MSE
+        print len(s.points)
+        ALL_POINT += len(s.points)
         # print s[2] # npoints
         print '**************************************'
     print 'ALL_POINT: ', ALL_POINT
     print '----------BELOW ARE POINTS----------'
-    for s,i in zip(surfs, range(len(surfs))):
-        print "SURFACE ", i
-        print s[2]
+    # for s,i in zip(surfs, range(len(surfs))):
+    #     print "SURFACE ", i
+    #     print s.points
     paint_surfs(surfs, npoints, 'all')
     print extradata
     for slice_fig in extradata[0]:
