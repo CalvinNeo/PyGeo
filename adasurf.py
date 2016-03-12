@@ -42,15 +42,18 @@ def paint_surfs(surfs, points, show = True, title = ''):
         Y = np.arange(ylim[0], ylim[1], (ylim[1]-ylim[0])/100.0)
         X, Y = np.meshgrid(X, Y)
         Z = -(X*a + Y*b + c)
-        # s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
+        s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
         x1 = ans.points[:, 0]
         y1 = ans.points[:, 1]
         z1 = ans.points[:, 2]
-        ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
+        # ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
 
     ax.set_zlim(zlim[0], zlim[1])
     # ax.set_ylim(ylim[0], ylim[1])
     # ax.set_xlim(xlim[0], xlim[1])
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
     pl.title(title)
@@ -174,6 +177,9 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
                         if generated_surf.residuals < config.same_threshold * nstd:
                             # 这里generated_surf里面已经包含了生成的点，但是这些点还没有从npoints中被移除，所以结果里面点会变多
                             all_surf.append(generated_surf)
+                        else:
+                            pass
+                            # print "ada gameover"
                 print 'try_new_surface: elapse', time.clock() - starttime,'group_id', group_id, '/', len_group, 'surface_count', len(all_surf), 'adaptive_rate', adaptive_rate, 'npartial_points', len(partial_points)
             
             if len(all_surf) > 0: # 如果生成了若干新面

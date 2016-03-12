@@ -19,15 +19,15 @@ from adasurf import AdaSurfConfig, adasurf, paint_surfs, identifysurf, point_nor
 ELAPSE_SEG = 0
 class SurfSegConfig:
     def __init__(self):
-        self.slice_count = 3
+        self.slice_count = 4
         self.origin_points = 5
-        self.most_combination_points = 30
-        self.same_threshold = 0.1 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
+        self.most_combination_points = 25
+        self.same_threshold = 0.2 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
         self.pointsame_threshold = 0.5
-        self.filter_rate = 0.07
+        self.filter_rate = 0.1
         self.ori_adarate = 0.5
         self.step_adarate = 1.4
-        self.max_adarate = 0.7
+        self.max_adarate = 0.6
         self.split_by_count = True
 
 def paint_points(points, show = True, title = ''):
@@ -42,6 +42,9 @@ def paint_points(points, show = True, title = ''):
     ax.scatter(x1, y1, z1, c='r')
 
     ax.set_zlim(zlim[0], zlim[1])
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
     ax.zaxis.set_major_locator(LinearLocator(10))
     ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
     pl.title(title)
@@ -68,7 +71,6 @@ def surf_segmentation(points, config, paint_when_end = False):
     starttime = time.clock()
 
     pca_md = mlab.PCA(np.copy(npoints))
-    
 
     # projection0 = pca_md.Y[:, 0]
     projection0 = npoints[:, 0]
@@ -97,11 +99,12 @@ def surf_segmentation(points, config, paint_when_end = False):
     partial_surfs, fail = [], np.array([]).reshape(0,3)
     for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
         print "slice", len(ptset)
-        paint_points(ptset)
+        # paint_points(ptset)
     for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
         print "--------------------------------------"
         print "before segment", ptsetindex, '/', len(pointsets)
-        allptfortest = np.vstack((ptset, np.array(fail)))
+        print '---000', ptset.shape, np.array(fail).shape, np.array(fail)
+        allptfortest = np.vstack((ptset, np.array(fail).reshape(-1,3)))
         print "len of surf is: ", len(partial_surfs), ", len of points is: ", len(allptfortest)
         if allptfortest != None and len(allptfortest) > 0 :
             partial_surfs, _, fail, extradata = identifysurf(allptfortest, adasurconfig, donorm = False, surfs = partial_surfs, title = str(ptsetindex), paint_when_end = paint_when_end)
