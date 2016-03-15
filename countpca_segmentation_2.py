@@ -19,15 +19,15 @@ from adasurf import AdaSurfConfig, adasurf, paint_surfs, identifysurf, point_nor
 ELAPSE_SEG = 0
 class SurfSegConfig:
     def __init__(self):
-        self.slice_count = 4
+        self.slice_count = 3
         self.origin_points = 5
-        self.most_combination_points = 25
-        self.same_threshold = 0.2 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
-        self.pointsame_threshold = 0.5
+        self.most_combination_points = 20
+        self.same_threshold = 0.15 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
+        self.pointsame_threshold = 0.2
         self.filter_rate = 0.1
-        self.ori_adarate = 0.5
-        self.step_adarate = 1.4
-        self.max_adarate = 0.6
+        self.ori_adarate = 1.0
+        self.step_adarate = 1.0
+        self.max_adarate = 1.0
         self.split_by_count = True
 
 def paint_points(points, show = True, title = ''):
@@ -72,8 +72,9 @@ def surf_segmentation(points, config, paint_when_end = False):
 
     pca_md = mlab.PCA(np.copy(npoints))
 
-    # projection0 = pca_md.Y[:, 0]
-    projection0 = npoints[:, 0]
+    projection0_direction = pca_md.Y[0]
+    projection0 = np.inner(projection0_direction, npoints)
+    # projection0 = npoints[:, 0]
     if config.split_by_count:
         step_count = len(projection0) / config.slice_count
         pointsets = [np.array([]).reshape(0,3)] * config.slice_count
@@ -96,6 +97,8 @@ def surf_segmentation(points, config, paint_when_end = False):
                 ptsetid = int((projection0[i] - projection0min) / step_len)
             pointsets[ptsetid] = np.vstack((pointsets[ptsetid], npoints[i]))
 
+    random.shuffle(pointsets)
+
     partial_surfs, fail = [], np.array([]).reshape(0,3)
     for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
         print "slice", len(ptset)
@@ -103,8 +106,11 @@ def surf_segmentation(points, config, paint_when_end = False):
     for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
         print "--------------------------------------"
         print "before segment", ptsetindex, '/', len(pointsets)
-        print '---000', ptset.shape, np.array(fail).shape, np.array(fail)
-        allptfortest = np.vstack((ptset, np.array(fail).reshape(-1,3)))
+        # print '---000', ptset.shape, np.array(fail).shape, np.array(fail), fail
+        if fail == None:
+            allptfortest = np.array(ptset)
+        else:
+            allptfortest = np.vstack((ptset, np.array(fail).reshape(-1,3)))
         print "len of surf is: ", len(partial_surfs), ", len of points is: ", len(allptfortest)
         if allptfortest != None and len(allptfortest) > 0 :
             partial_surfs, _, fail, extradata = identifysurf(allptfortest, adasurconfig, donorm = False, surfs = partial_surfs, title = str(ptsetindex), paint_when_end = paint_when_end)

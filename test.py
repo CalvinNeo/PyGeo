@@ -72,3 +72,5 @@ if __name__ == '__main__':
     mask = np.array([True, False, False, False, True])
     print arr[mask]
     print np.array([]).shape
+    arr = np.array([1,2,3,4,5])
+    print arr[0:3]
