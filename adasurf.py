@@ -140,7 +140,7 @@ def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
         else:
             prev = len(iterable)
 
-def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = False, title = ''):
+def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = False, title = '', current_direction = None):
     def same_surf(surf, point):
         # e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
         A = np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4)
@@ -178,7 +178,10 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
                 for circum in combinations(choices, config.origin_points):
                     # 当取得的点的标准差小于总体的标准差才进行最小二乘拟合
                     starttime_circum = time.clock()
-                    std_circum = np.std(np.array(circum)[:, 1:-1])
+                    if current_direction == None:
+                        std_circum = np.std(np.array(circum)[:, 1:-1])
+                    else：
+                        std_circum = np.std(np.array(circum))
                     TOP_MIN_STD = min(TOP_MIN_STD, std_circum)
                     ELAPSE_STD += time.clock() - starttime_circum
                     if std_circum < config.same_threshold * nstd * adaptive_rate: # 如果方差满足要求

@@ -113,7 +113,7 @@ def surf_segmentation(points, config, paint_when_end = False):
             allptfortest = np.vstack((ptset, np.array(fail).reshape(-1,3)))
         print "len of surf is: ", len(partial_surfs), ", len of points is: ", len(allptfortest)
         if allptfortest != None and len(allptfortest) > 0 :
-            partial_surfs, _, fail, extradata = identifysurf(allptfortest, adasurconfig, donorm = False, surfs = partial_surfs, title = str(ptsetindex), paint_when_end = paint_when_end)
+            partial_surfs, _, fail, extradata = identifysurf(allptfortest, adasurconfig, donorm = False, surfs = partial_surfs, title = str(ptsetindex), paint_when_end = paint_when_end, current_direction = projection0_direction)
             if paint_when_end:
                 slice_fig.append(extradata[0])
         if fail == None:
