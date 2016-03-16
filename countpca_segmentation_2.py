@@ -19,12 +19,12 @@ from adasurf import AdaSurfConfig, adasurf, paint_surfs, identifysurf, point_nor
 ELAPSE_SEG = 0
 class SurfSegConfig:
     def __init__(self):
-        self.slice_count = 3
-        self.origin_points = 5
+        self.slice_count = 2
+        self.origin_points = 7
         self.most_combination_points = 20
-        self.same_threshold = 0.15 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
-        self.pointsame_threshold = 0.2
-        self.filter_rate = 0.1
+        self.same_threshold = 0.5 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
+        self.pointsame_threshold = 0.3
+        self.filter_rate = 0.0
         self.ori_adarate = 1.0
         self.step_adarate = 1.0
         self.max_adarate = 1.0
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     print 'config', config.__dict__
     import time
     starttime = time.clock()
-    surfs, npoints, extradata = surf_segmentation(c, config, paint_when_end = True)
+    surfs, npoints, extradata = surf_segmentation(c, config, paint_when_end = False)
 
     print "----------BELOW ARE SURFACES---------- count:", len(surfs)
     print 'TOTAL: ', time.clock() - starttime

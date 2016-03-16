@@ -42,11 +42,11 @@ def paint_surfs(surfs, points, show = True, title = ''):
         Y = np.arange(ylim[0], ylim[1], (ylim[1]-ylim[0])/100.0)
         X, Y = np.meshgrid(X, Y)
         Z = -(X*a + Y*b + c)
-        # s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
+        s = ax.plot_wireframe(X, Y, Z, rstride=15, cstride=15)
         x1 = ans.points[:, 0]
         y1 = ans.points[:, 1]
         z1 = ans.points[:, 2]
-        ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
+        # ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
 
     ax.set_zlim(zlim[0], zlim[1])
     # ax.set_ylim(ylim[0], ylim[1])
@@ -63,14 +63,15 @@ def paint_surfs(surfs, points, show = True, title = ''):
 
 class AdaSurfConfig:
     def __init__(self, *initial_data, **kwargs):
-        self.origin_points = 5
+        self.slice_count = 1
+        self.origin_points = 7
         self.most_combination_points = 20
-        self.same_threshold = 0.5
-        self.filter_rate = 0.01
-        self.ori_adarate = 0.5
-        self.step_adarate = 1.5
-        self.max_adarate = 1.5
-        self.pointsame_threshold = 0.3
+        self.same_threshold = 0.5 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
+        self.pointsame_threshold = 0.1
+        self.filter_rate = 0.04
+        self.ori_adarate = 1.0
+        self.step_adarate = 1.0
+        self.max_adarate = 1.0
 
         for dictionary in initial_data:
             for key in dictionary:
@@ -148,7 +149,6 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         lower = math.sqrt(np.dot(A[0:3], A[0:3].reshape(4,1)))
         e = abs(upper / lower)
         # print e.shape, upper.shape, nstd, e[0][0].shape, e[0][0] <= config.pointsame_threshold * nstd, config.pointsame_threshold
-        assert True == True
         # return e <= config.pointsame_threshold * nstd, e
         return e <= config.pointsame_threshold, e
 
