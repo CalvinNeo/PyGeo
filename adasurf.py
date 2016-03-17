@@ -21,14 +21,21 @@ class Surface:
         self.args = np.array([1.0,1.0,1.0])
         self.initial_points = np.array([]).reshape(0, 3)
 
-        def __str__(self):
-            return str(tuple(self.args, self.residuals, self.points, self.initial_points))
-
         for dictionary in initial_data:
             for key in dictionary:
                 setattr(self, key, dictionary[key])
         for key in kwargs:
             setattr(self, key, kwargs[key])
+
+
+    def printf(self):
+        print str((self.args, self.residuals, self.initial_points))
+
+    def addpoint(self, p):
+        self.points = np.vstack((self.points, p))
+
+    def __str__(self):
+        return str(tuple(self.args, self.residuals, self.points, self.initial_points))
 
 def paint_surfs(surfs, points, show = True, title = ''):
     fig = pl.figure()
@@ -118,6 +125,7 @@ def adasurf(points, config, initial_points = None):
 def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
     '''
         In this case:
+            iterable -- npoints
             predicate -- judge_point
             rountclearup -- new_surf
     '''
@@ -130,11 +138,13 @@ def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
                 fail.append(x)
         iterable = np.array(fail) # renew iterable
         print 'before adding a new surface, unfitted points remaining', len(iterable)
-        if roundclearup(iterable):
+        if roundclearup(iterable): # if return True quit Pipecycle loop
             fail = clearing(fail)
             return fail
         # assert prev != len(iterable)
-        if prev == len(iterable):
+        if prev != None:
+            print 'prev - len(iterable)', prev - len(iterable)
+        if prev != None and prev - len(iterable) < 10:
             # assert before return
             return
         else:
@@ -142,13 +152,14 @@ def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
 
 def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = False, title = '', current_direction = None):
     def same_surf(surf, point):
-        # e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
-        A = np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4)
-        X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
-        upper = np.dot(A, X)[0,0]
-        lower = math.sqrt(np.dot(A[0:3], A[0:3].reshape(4,1)))
-        e = abs(upper / lower)
-        # print e.shape, upper.shape, nstd, e[0][0].shape, e[0][0] <= config.pointsame_threshold * nstd, config.pointsame_threshold
+        e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
+
+        # A = np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4)
+        # X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
+        # upper = np.dot(A, X)[0,0]
+        # lower = math.sqrt(np.dot(A[0:3], A[0:3].reshape(4,1)))
+        # e = abs(upper / lower)
+
         # return e <= config.pointsame_threshold * nstd, e
         return e <= config.pointsame_threshold, e
 
@@ -180,8 +191,8 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
                     starttime_circum = time.clock()
                     if current_direction == None:
                         std_circum = np.std(np.array(circum)[:, 1:-1])
-                    else：
-                        std_circum = np.std(np.array(circum))
+                    else:
+                        std_circum = np.std(np.inner(current_direction, circum))
                     TOP_MIN_STD = min(TOP_MIN_STD, std_circum)
                     ELAPSE_STD += time.clock() - starttime_circum
                     if std_circum < config.same_threshold * nstd * adaptive_rate: # 如果方差满足要求
@@ -221,7 +232,8 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         if len(suitable_surfs) > 0:
             surf, _, surf_id = min(suitable_surfs, key=lambda x:x[1])
             # NO renew surf
-            surfs[surf_id] = Surface(args = surf.args, residuals = surf.residuals, points = np.vstack((surf.points, point)), initial_points = None)
+            surfs[surf_id].addpoint(point)
+            # surfs[surf_id] = Surface(args = surf.args, residuals = surf.residuals, points = np.vstack((surf.points, point)), initial_points = None)
             # surfs[surf_id] = adasurf(np.vstack((surf[2], point)), config)
             return True
         else:
@@ -247,7 +259,11 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
     else:
         npoints = points
 
-    nstd = np.std(npoints[:, 1:-1])
+    if current_direction == None:
+        nstd = np.std(npoints[:, 1:-1])
+    else:
+        nstd = np.std(np.inner(current_direction, npoints))
+    
     print 'nstd of all points in this segment', nstd
     print 'len(surf)', len(surfs)
     fail = Pipecycle(npoints, judge_point, new_surf, remove_poor_support_surface)

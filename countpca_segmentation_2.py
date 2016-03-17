@@ -19,12 +19,12 @@ from adasurf import AdaSurfConfig, adasurf, paint_surfs, identifysurf, point_nor
 ELAPSE_SEG = 0
 class SurfSegConfig:
     def __init__(self):
-        self.slice_count = 2
+        self.slice_count = 3
         self.origin_points = 7
         self.most_combination_points = 20
-        self.same_threshold = 0.5 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
-        self.pointsame_threshold = 0.3
-        self.filter_rate = 0.0
+        self.same_threshold = 0.3 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
+        self.pointsame_threshold = 0.35
+        self.filter_rate = 0.05
         self.ori_adarate = 1.0
         self.step_adarate = 1.0
         self.max_adarate = 1.0
@@ -106,6 +106,7 @@ def surf_segmentation(points, config, paint_when_end = False):
     for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
         print "--------------------------------------"
         print "before segment", ptsetindex, '/', len(pointsets)
+        print 'derived surfs:'
         # print '---000', ptset.shape, np.array(fail).shape, np.array(fail), fail
         if fail == None:
             allptfortest = np.array(ptset)
@@ -120,6 +121,10 @@ def surf_segmentation(points, config, paint_when_end = False):
             print "after segment", ptsetindex, "len of surf", len(partial_surfs), "fail is None", fail
         else:
             print "after segment", ptsetindex, "len of surf", len(partial_surfs), "len of fail", len(fail)
+
+        for x in partial_surfs:
+            x.printf()
+
     surfs.extend(partial_surfs)
 
     # fig = pl.figure()
