@@ -19,29 +19,35 @@ from adasurf import AdaSurfConfig, adasurf, paint_surfs, identifysurf, point_nor
 ELAPSE_SEG = 0
 class SurfSegConfig:
     def __init__(self):
-        self.slice_count = 3
-        self.origin_points = 7
+        self.slice_count = 2
+        self.origin_points = 5
         self.most_combination_points = 20
         self.same_threshold = 0.3 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
-        self.pointsame_threshold = 0.35
-        self.filter_rate = 0.05
-        self.ori_adarate = 1.0
+        self.pointsame_threshold = 1
+        self.filter_rate = 0.08
+        self.filter_count = 10
+        self.ori_adarate = 2.0
         self.step_adarate = 1.0
-        self.max_adarate = 1.0
+        self.max_adarate = 2.0
         self.split_by_count = True
 
-def paint_points(points, show = True, title = ''):
+def paint_points(points, show = True, title = '', xlim = None, ylim = None, zlim = None):
     fig = pl.figure()
     ax = fig.add_subplot(111, projection='3d')
-    xlim = (np.min(points[:, 0]), np.max(points[:, 0]))
-    ylim = (np.min(points[:, 1]), np.max(points[:, 1]))
-    zlim = (np.min(points[:, 2]), np.max(points[:, 2]))
+    if xlim == None:
+        xlim = (np.min(points[:, 0]), np.max(points[:, 0]))
+    if ylim == None:
+        ylim = (np.min(points[:, 1]), np.max(points[:, 1]))
+    if zlim == None:
+        zlim = (np.min(points[:, 2]), np.max(points[:, 2]))
     x1 = points[:, 0]
     y1 = points[:, 1]
     z1 = points[:, 2]
     ax.scatter(x1, y1, z1, c='r')
 
     ax.set_zlim(zlim[0], zlim[1])
+    ax.set_ylim(ylim[0], ylim[1])
+    ax.set_xlim(xlim[0], xlim[1])
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_zlabel("z")
@@ -64,17 +70,23 @@ def surf_segmentation(points, config, paint_when_end = False):
         , 'step_adarate': config.step_adarate
         , 'max_adarate': config.max_adarate
         , 'pointsame_threshold': config.pointsame_threshold
+        , 'filter_count' : config.filter_count
         })
     surfs = []
     slice_fig = []
     npoints = point_normalize(points)
     starttime = time.clock()
+    xlim = (np.min(npoints[:, 0]), np.max(npoints[:, 0]))
+    ylim = (np.min(npoints[:, 1]), np.max(npoints[:, 1]))
+    zlim = (np.min(npoints[:, 2]), np.max(npoints[:, 2]))
 
     pca_md = mlab.PCA(np.copy(npoints))
 
-    projection0_direction = pca_md.Y[0]
-    projection0 = np.inner(projection0_direction, npoints)
-    # projection0 = npoints[:, 0]
+    projection0_direction = None
+
+    # projection0_direction = pca_md.Y[0]
+    # projection0 = np.inner(projection0_direction, npoints)
+    projection0 = npoints[:, 0]
     if config.split_by_count:
         step_count = len(projection0) / config.slice_count
         pointsets = [np.array([]).reshape(0,3)] * config.slice_count
@@ -101,8 +113,8 @@ def surf_segmentation(points, config, paint_when_end = False):
 
     partial_surfs, fail = [], np.array([]).reshape(0,3)
     for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
-        print "slice", len(ptset)
-        # paint_points(ptset)
+        print "slice", len(ptset), xlim, ylim, zlim
+        # paint_points(ptset, xlim = xlim, ylim = ylim, zlim = zlim)
     for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
         print "--------------------------------------"
         print "before segment", ptsetindex, '/', len(pointsets)
@@ -114,7 +126,8 @@ def surf_segmentation(points, config, paint_when_end = False):
             allptfortest = np.vstack((ptset, np.array(fail).reshape(-1,3)))
         print "len of surf is: ", len(partial_surfs), ", len of points is: ", len(allptfortest)
         if allptfortest != None and len(allptfortest) > 0 :
-            partial_surfs, _, fail, extradata = identifysurf(allptfortest, adasurconfig, donorm = False, surfs = partial_surfs, title = str(ptsetindex), paint_when_end = paint_when_end, current_direction = projection0_direction)
+            partial_surfs, _, fail, extradata = identifysurf(allptfortest, adasurconfig, donorm = False, surfs = partial_surfs, title = str(ptsetindex)
+                , paint_when_end = paint_when_end, current_direction = projection0_direction)
             if paint_when_end:
                 slice_fig.append(extradata[0])
         if fail == None:
@@ -148,7 +161,7 @@ if __name__ == '__main__':
     print 'config', config.__dict__
     import time
     starttime = time.clock()
-    surfs, npoints, extradata = surf_segmentation(c, config, paint_when_end = False)
+    surfs, npoints, extradata = surf_segmentation(c, config, paint_when_end = True)
 
     print "----------BELOW ARE SURFACES---------- count:", len(surfs)
     print 'TOTAL: ', time.clock() - starttime

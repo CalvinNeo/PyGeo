@@ -74,3 +74,7 @@ if __name__ == '__main__':
     print np.array([]).shape
     arr = np.array([1,2,3,4,5])
     print arr[0:3]
+    arr = np.array([3.0, 4.0])
+    print np.linalg.norm(arr)
+    arr = np.array([[1.0,1.0], [100.0, 100.0]])
+    print np.linalg.norm(arr)
