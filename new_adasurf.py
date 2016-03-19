@@ -124,39 +124,41 @@ def adasurf(points, config, initial_points = None):
     
     return Surface(args = r[0] , residuals = MSE(r[0], points) , points = points, initial_points = initial_points)
 
-def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
-    '''
-        In this case:
-            iterable -- npoints
-            predicate -- judge_point
-            rountclearup -- new_surf
-            clearing -- remove_poor_support_surface
-    '''
-    prev = None
-    while len(iterable) > 0:
-        fail = []
-        for x in iterable:
-            val = predicate(x)
-            if not val:
-                fail.append(x)
-        iterable = np.array(fail) # renew iterable
-        print 'before adding a new surface, unfitted points remaining', len(iterable)
-        if roundclearup(iterable): # if return True quit Pipecycle loop
-            fail = clearing(fail)
-            return fail
-        # assert prev != len(iterable)
-        if prev != None:
-            print 'prev minus len(iterable)', prev - len(iterable)
-        if prev != None and prev - len(iterable) < config.weak_abort:
-            # assert before return
-            print 'drop cause too weak'
-            fail = clearing(fail)
-            return fail
-        else:
-            prev = len(iterable)
 
 PRINT_COUNT = 0
 def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = False, title = '', current_direction = None):
+
+    def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
+        '''
+            In this case:
+                iterable -- npoints
+                predicate -- judge_point
+                rountclearup -- new_surf
+                clearing -- remove_poor_support_surface
+        '''
+        prev = None
+        while len(iterable) > 0:
+            fail = []
+            for x in iterable:
+                val = predicate(x)
+                if not val:
+                    fail.append(x)
+            iterable = np.array(fail) # renew iterable
+            print 'before adding a new surface, unfitted points remaining', len(iterable)
+            if roundclearup(iterable): # if return True quit Pipecycle loop
+                fail = clearing(fail)
+                return fail
+            # assert prev != len(iterable)
+            if prev != None:
+                print 'prev - len(iterable) = ', prev - len(iterable)
+            if prev != None and prev - len(iterable) < config.weak_abort:
+                # assert before return
+                print '^^^drop cause too weak'
+                fail = clearing(fail)
+                return fail
+            else:
+                prev = len(iterable)
+            
     def same_surf(surf, point):
 
         # A = np.abs(np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4))
@@ -192,7 +194,7 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         #     surfs[surf_id] = adasurf(surfs[surf_id].points, config)
 
         global ELAPSE_STD
-        TOP_MIN_STD = 99999
+        TOP_MIN_RES = 99999
         all_surf = []
         import time
         starttime = time.clock()
@@ -203,30 +205,19 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         while len(all_surf) == 0: # 如果始终不能生成新的面
             for group_id in xrange(len_group):
                 choices = partial_points[group_id*config.most_combination_points:(group_id+1)*config.most_combination_points, :]
-                if current_direction == None:
-                    choice_nstd = (np.std(np.array(choices)[:, 1]) + np.std(np.array(choices)[:, 2])) / 2
-                else:
-                    choice_nstd = np.std(np.inner(current_direction, choices))
                 for circum in combinations(choices, config.origin_points):
-                    # 当取得的点的标准差小于总体的标准差才进行最小二乘拟合
                     starttime_circum = time.clock()
-                    if current_direction == None:
-                        std_circum = (np.std(np.array(circum)[:, 1]) + np.std(np.array(circum)[:, 2])) / 2
-                    else:
-                        std_circum = np.std(np.inner(current_direction, circum))
-                    TOP_MIN_STD = min(TOP_MIN_STD, std_circum)
                     ELAPSE_STD += time.clock() - starttime_circum
-                    # 这边不能用任何带方差的判断,因为这里方差求得是segment方向上的方差
-                    if True or std_circum < config.same_threshold * choice_nstd * adaptive_rate: # 如果方差满足要求
-                        generated_surf = adasurf(np.array(circum), config)
-                        if generated_surf.residuals < config.same_threshold * choice_nstd:
-                            # 这里generated_surf里面已经包含了生成的点，但是这些点还没有从npoints中被移除，所以结果里面点会变多
-                            all_surf.append(generated_surf)
-                            # print 'generated_surf', generated_surf.residuals
-                        else:
-                            pass
-                print 'try_new_surface: elapse', time.clock() - starttime, 'group_id', group_id, '/', len_group, 'surface_count', 
-                print len(all_surf), 'adaptive_rate', adaptive_rate, 'npartial_points', len(partial_points), 'TOP_MIN_STD', TOP_MIN_STD, nstd, choice_nstd
+                    generated_surf = adasurf(np.array(circum), config)
+                    TOP_MIN_RES = min(TOP_MIN_RES, generated_surf.residuals)
+                    if generated_surf.residuals < config.same_threshold:
+                        # 这里generated_surf里面已经包含了生成的点，但是这些点还没有从npoints中被移除，所以结果里面点会变多
+                        all_surf.append(generated_surf)
+                        # print 'generated_surf', generated_surf.residuals, 'residual', generated_surf.residuals
+                    else:
+                        pass
+                print 'try_new_surface: elapse', time.clock() - starttime, 'group_id', group_id, '/', len_group, 'len(surfs)', 
+                print len(all_surf), 'adaptive_rate', adaptive_rate, 'len(npoints)', len(partial_points), 'TOP_MIN_RES', TOP_MIN_RES
             
             if len(all_surf) > 0: # 如果生成了若干新面
                 surfs.append(min(all_surf, key=lambda x:x.residuals))
@@ -242,7 +233,6 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
                         else:
                             adaptive_rate = config.max_adarate * 1.01
                     else: # adarate不能过大，否则就不精确了
-                        print 'TOP_MIN_STD', TOP_MIN_STD, nstd
                         return True
 
 
