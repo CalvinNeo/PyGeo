@@ -22,15 +22,15 @@ class NewConfig:
         self.slice_count = 4
         self.origin_points = 5
         self.most_combination_points = 35
-        self.same_threshold = 0.08 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
-        self.pointsame_threshold = 2.0
+        self.same_threshold = 0.05 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
+        self.pointsame_threshold = 1.0
         self.filter_rate = 0.08
         self.filter_count = 80
         self.ori_adarate = 2.0
         self.step_adarate = 1.0
         self.max_adarate = 2.0
         self.split_by_count = True
-        self.weak_abort = 60
+        self.weak_abort = 70
 
 def paint_points(points, show = True, title = '', xlim = None, ylim = None, zlim = None):
     fig = pl.figure()
@@ -84,7 +84,7 @@ def newsln(points, config, paint_when_end = False):
 
     partial_surfs, allptfortest = [], npoints.copy()
     # for (ptset, ptsetindex) in zip(pointsets, range(len(pointsets))):
-    for iter_times in xrange(3):
+    for iter_times in xrange(5):
         print "--------------------------------------"
         print "before iter", iter_times
         print "len of surf is: ", len(partial_surfs), ", len of points is: ", len(allptfortest)

@@ -56,8 +56,8 @@ def paint_surfs(surfs, points, show = True, title = ''):
         ax.scatter(x1, y1, z1, c='rcykgm'[surf_id % 6], marker='o^sd*+xp'[int(surf_id/6)])
 
     ax.set_zlim(zlim[0], zlim[1])
-    # ax.set_ylim(ylim[0], ylim[1])
-    # ax.set_xlim(xlim[0], xlim[1])
+    ax.set_ylim(ylim[0], ylim[1])
+    ax.set_xlim(xlim[0], xlim[1])
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_zlabel("z")
@@ -70,16 +70,19 @@ def paint_surfs(surfs, points, show = True, title = ''):
 
 class AdaSurfConfig:
     def __init__(self, *initial_data, **kwargs):
-        self.origin_points = 7
-        self.most_combination_points = 20
-        self.same_threshold = 0.5 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
-        self.pointsame_threshold = 0.1
-        self.filter_rate = 0.04
-        self.filter_count = 10
-        self.ori_adarate = 1.0
+        self.slice_count = 4
+        self.origin_points = 5
+        self.most_combination_points = 35
+        self.same_threshold = 0.05 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
+        self.pointsame_threshold = 1.0
+        self.filter_rate = 0.08
+        self.filter_count = 80
+        self.ori_adarate = 2.0
         self.step_adarate = 1.0
-        self.max_adarate = 1.0
-        self.weak_abort = 20
+        self.max_adarate = 2.0
+        self.split_by_count = True
+        self.weak_abort = 70
+
 
         for dictionary in initial_data:
             for key in dictionary:
@@ -161,11 +164,11 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
             
     def same_surf(surf, point):
 
-        # A = np.abs(np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4))
-        # X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
-        # upper = np.dot(A, X)[0,0]
-        # lower = math.sqrt(np.dot(A[0:3], (A[0:3]).reshape(4,1)))
-        # e = abs(upper / lower)
+        A = np.abs(np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4))
+        X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
+        upper = np.dot(A, X)[0,0]
+        lower = math.sqrt(np.dot(A[0:3], (A[0:3]).reshape(4,1)))
+        e = abs(upper / lower)
 
         # global PRINT_COUNT
         # if PRINT_COUNT < 977:
@@ -173,7 +176,7 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         #     PRINT_COUNT += 1
         # return e <= config.pointsame_threshold, e
 
-        e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
+        # e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
         # global PRINT_COUNT
         # if PRINT_COUNT < 100:
         #     print "printcount:", e, config.pointsame_threshold * surf.residuals * len(points)
@@ -213,7 +216,10 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
                     if generated_surf.residuals < config.same_threshold:
                         # 这里generated_surf里面已经包含了生成的点，但是这些点还没有从npoints中被移除，所以结果里面点会变多
                         all_surf.append(generated_surf)
-                        # print 'generated_surf', generated_surf.residuals, 'residual', generated_surf.residuals
+
+                        # # no comparing now
+                        # surfs.append(generated_surf)
+                        # return False
                     else:
                         pass
                 print 'try_new_surface: elapse', time.clock() - starttime, 'group_id', group_id, '/', len_group, 'len(surfs)', 

@@ -124,46 +124,48 @@ def adasurf(points, config, initial_points = None):
     
     return Surface(args = r[0] , residuals = MSE(r[0], points) , points = points, initial_points = initial_points)
 
-def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
-    '''
-        In this case:
-            iterable -- npoints
-            predicate -- judge_point
-            rountclearup -- new_surf
-            clearing -- remove_poor_support_surface
-    '''
-    prev = None
-    while len(iterable) > 0:
-        fail = []
-        for x in iterable:
-            val = predicate(x)
-            if not val:
-                fail.append(x)
-        iterable = np.array(fail) # renew iterable
-        print 'before adding a new surface, unfitted points remaining', len(iterable)
-        if roundclearup(iterable): # if return True quit Pipecycle loop
-            fail = clearing(fail)
-            return fail
-        # assert prev != len(iterable)
-        if prev != None:
-            print 'prev minus len(iterable)', prev - len(iterable)
-        if prev != None and prev - len(iterable) < config.weak_abort:
-            # assert before return
-            print 'drop cause too weak'
-            fail = clearing(fail)
-            return fail
-        else:
-            prev = len(iterable)
 
 PRINT_COUNT = 0
 def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = False, title = '', current_direction = None):
+
+    def Pipecycle(iterable, predicate, roundclearup = None, clearing = None):
+        '''
+            In this case:
+                iterable -- npoints
+                predicate -- judge_point
+                rountclearup -- new_surf
+                clearing -- remove_poor_support_surface
+        '''
+        prev = None
+        while len(iterable) > 0:
+            fail = []
+            for x in iterable:
+                val = predicate(x)
+                if not val:
+                    fail.append(x)
+            iterable = np.array(fail) # renew iterable
+            print 'before adding a new surface, unfitted points remaining', len(iterable)
+            if roundclearup(iterable): # if return True quit Pipecycle loop
+                fail = clearing(fail)
+                return fail
+            # assert prev != len(iterable)
+            if prev != None:
+                print 'prev minus len(iterable)', prev - len(iterable)
+            if prev != None and prev - len(iterable) < config.weak_abort:
+                # assert before return
+                print 'drop cause too weak'
+                fail = clearing(fail)
+                return fail
+            else:
+                prev = len(iterable)
+            
     def same_surf(surf, point):
 
-        # A = np.abs(np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4))
-        # X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
-        # upper = np.dot(A, X)[0,0]
-        # lower = math.sqrt(np.dot(A[0:3], (A[0:3]).reshape(4,1)))
-        # e = abs(upper / lower)
+        A = np.abs(np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4))
+        X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
+        upper = np.dot(A, X)[0,0]
+        lower = math.sqrt(np.dot(A[0:3], (A[0:3]).reshape(4,1)))
+        e = abs(upper / lower)
 
         # global PRINT_COUNT
         # if PRINT_COUNT < 977:
@@ -171,7 +173,7 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         #     PRINT_COUNT += 1
         # return e <= config.pointsame_threshold, e
 
-        e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
+        # e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
         # global PRINT_COUNT
         # if PRINT_COUNT < 100:
         #     print "printcount:", e, config.pointsame_threshold * surf.residuals * len(points)

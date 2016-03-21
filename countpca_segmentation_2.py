@@ -25,12 +25,12 @@ class SurfSegConfig:
         self.same_threshold = 0.1 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
         self.pointsame_threshold = 1.0
         self.filter_rate = 0.08
-        self.filter_count = 35
+        self.filter_count = 50
         self.ori_adarate = 2.0
         self.step_adarate = 1.0
         self.max_adarate = 2.0
         self.split_by_count = True
-        self.weak_abort = 20
+        self.weak_abort = 45
 
 def paint_points(points, show = True, title = '', xlim = None, ylim = None, zlim = None):
     fig = pl.figure()

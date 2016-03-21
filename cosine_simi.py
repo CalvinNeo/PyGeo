@@ -37,11 +37,11 @@ class Surface:
     def normalizer(self):
         return math.sqrt(self.args[0]**2 + self.args[1]**2 + 1)
 
-    def direct(self):
+    def vec(self):
         return np.array([self.args[0], self.args[1], 1])
 
     def normvec(self):
-        return self.direct() / self.normalizer()
+        return self.vec() / self.normalizer()
 
     def __str__(self):
         return str(tuple(self.args, self.residuals, self.points, self.initial_points))
@@ -79,15 +79,12 @@ def paint_surfs(surfs, points, show = True, title = ''):
 
 class AdaSurfConfig:
     def __init__(self, *initial_data, **kwargs):
-        self.origin_points = 7
-        self.most_combination_points = 20
-        self.same_threshold = 0.5 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
-        self.pointsame_threshold = 0.1
-        self.filter_rate = 0.04
-        self.filter_count = 10
-        self.ori_adarate = 1.0
-        self.step_adarate = 1.0
-        self.max_adarate = 1.0
+        self.origin_points = 5
+        self.most_combination_points = 25
+        self.same_threshold = 0.1 # the smaller, the more accurate when judging two surfaces are identical, more surfaces can be generated
+        self.pointsame_threshold = 3.0
+        self.same_surf_rate = 0.1
+        self.filter_count = 50
         self.weak_abort = 20
 
         for dictionary in initial_data:
@@ -130,41 +127,106 @@ def adasurf(points, config, initial_points = None):
     r = leastsq(residuals, [1, 0.5, 1], args=(x1, y1, z1))
     ELAPSE_LSQ += time.clock() - starttime
     
-    return Surface(args = r[0] , residuals = MSE(r[0], points) , points = points, initial_points = initial_points)
+    return Surface(args = r[0], residuals = MSE(r[0], points), points = points, initial_points = initial_points)
 
 
 PRINT_COUNT = 0
 def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = False, title = '', current_direction = None):
-            
     def same_surf(surf1, surf2):
         v1, v2 = surf1.normvec(), surf2.normvec()
-        return np.dot(v1, v2) / (v1.norm() * v2.norm()) < 0.1
+        return np.dot(v1, v2) < config.same_surf_rate 
 
     def combine_surf():
-        # combine similar surf
-        pass
+        # combine similar surf, always dealing the last surf
+        if len(surfs) > 1:
+            for i in xrange(len(surfs) - 1):
+                if same_surf(surfs[i], surfs[-1]):
+                    surfs[i].addpoint(surfs[-1].points)
+                    break
+            del surfs[-1]
 
-    def belong_point(unfixed_point):
+    def belong_point(surf, point):
         # if possible, add one point to one of the surfaces
-        pass
+        A = np.abs(np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4))
+        X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
+        upper = np.dot(A, X)[0,0]
+        lower = math.sqrt(np.dot(A[0:3], (A[0:3]).reshape(4,1)))
+        e = abs(upper / lower)
+
+        # global PRINT_COUNT
+        # if PRINT_COUNT < 400:
+        #     print "printcount:", e, config.pointsame_threshold
+        #     PRINT_COUNT += 1
+        return e <= config.pointsame_threshold, e
+
+    def ada_point(unfixed_points):
+        def find_surf(p):
+            for surf in surfs:
+                r, _ = belong_point(surf, p)
+                if r:
+                    surf.addpoint(p)
+                    return True
+            return False
+        fail = []
+        for p in unfixed_points:
+            if not find_surf(p):
+                fail.append(p)
+        return np.array(fail)                
+
+    def filter_surf(ori_points):
+        newfail = np.array([]).reshape(0, 3)
+        index_to_remove = []
+        for (surf, index) in zip(surfs, range(len(surfs))):
+            supporting = len(surf.points)
+            if supporting < config.filter_count:
+                print "***drop one"
+                newfail = np.vstack((newfail, surf.points))
+                index_to_remove.append(index)
+        for index in sorted(index_to_remove, reverse=True):
+            del surfs[index]
+        return np.vstack((np.array(ori_points).reshape((-1, 3)), newfail.reshape((-1, 3))))
+
+    def new_surf(partial_points):
+        MIN_RESIDUAL = 999999999
+        np.random.shuffle(partial_points[:])
+        all_surf = []
+        len_group = int(math.ceil(len(partial_points)*1.0/config.most_combination_points))
+        for group_id in xrange(len_group):
+            choices = partial_points[group_id*config.most_combination_points:(group_id+1)*config.most_combination_points, :]
+            for circum in combinations(choices, config.origin_points):
+                generated_surf = adasurf(np.array(circum), config)
+                # global PRINT_COUNT
+                # if PRINT_COUNT < 800:
+                #     print "sss:", generated_surf.residuals
+                #     PRINT_COUNT += 1
+                MIN_RESIDUAL = min(generated_surf.residuals, MIN_RESIDUAL)
+                if generated_surf.residuals < config.same_threshold:
+                    all_surf.append(generated_surf)
+                    break
+        # print MIN_RESIDUAL
+        if len(all_surf) > 0:
+            # choose the best surface
+            # print len(all_surf)
+            surfs.append(min(all_surf, key=lambda x:x.residuals))
+            return True
+        else:
+            # can't generate one surface
+            return False
 
     if donorm:
         npoints = point_normalize(points)
     else:
         npoints = points
 
+    rest_points = npoints.copy()
+    while len(rest_points) > 20:
+        print "-----", len(rest_points), len(surfs)
+        if new_surf(rest_points):
+            combine_surf()
+            rest_points = ada_point(rest_points)
+            rest_points = filter_surf(rest_points)
+
     print 'len(surf)', len(surfs)
-
-    all_surf = []
-    partial_points = npoints.copy()
-    np.random.shuffle(partial_points[:])
-    len_group = int(math.ceil(len(partial_points)*1.0/config.most_combination_points))
-    for group_id in xrange(len_group):
-        choices = partial_points[group_id*config.most_combination_points:(group_id+1)*config.most_combination_points, :]
-        generated_surf = adasurf(np.array(circum), config)
-        if generated_surf.residuals < config.same_threshold:
-            all_surf.append(generated_surf)
-
 
     fig = None
     if paint_when_end:
@@ -177,7 +239,6 @@ if __name__ == '__main__':
 
     import time
     surfs, npoints, _ = identifysurf(c, AdaSurfConfig())
-    print 'TOTAL-TIME: ', time.clock() - starttime
     print 'TOTAL_POINT: ', len(npoints)
     print "----------BELOW ARE SURFACES----------"
     for s,i in zip(surfs, range(len(surfs))):
