@@ -141,9 +141,11 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         return np.dot(v1, v2) / (v1.norm() * v2.norm()) < 0.1
 
     def combine_surf():
+        # combine similar surf
         pass
 
     def belong_point(unfixed_point):
+        # if possible, add one point to one of the surfaces
         pass
 
     if donorm:
