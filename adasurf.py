@@ -161,11 +161,11 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
             
     def same_surf(surf, point):
 
-        A = np.abs(np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4))
-        X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
-        upper = np.dot(A, X)[0,0]
-        lower = math.sqrt(np.dot(A[0:3], (A[0:3]).reshape(4,1)))
-        e = abs(upper / lower)
+        # A = np.abs(np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4))
+        # X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
+        # upper = np.dot(A, X)[0,0]
+        # lower = math.sqrt(np.dot(A[:, 0:3], (A[:, 0:3]).reshape(3,1)))
+        # e = abs(upper / lower)
 
         # global PRINT_COUNT
         # if PRINT_COUNT < 977:
@@ -173,7 +173,7 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         #     PRINT_COUNT += 1
         # return e <= config.pointsame_threshold, e
 
-        # e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
+        e = abs(point[2]-config.surf_fun(point[0], point[1], surf.args))
         # global PRINT_COUNT
         # if PRINT_COUNT < 100:
         #     print "printcount:", e, config.pointsame_threshold * surf.residuals * len(points)

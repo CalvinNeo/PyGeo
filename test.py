@@ -37,6 +37,23 @@ class Test:
 #                 arry[j-1],arry[j] = arry[j],arry[j-1]      #则交换两者
 #     return arry
 
+
+def belong_point(args, point):
+    # if possible, add one point to one of the surfaces
+
+    A = np.array([args[0], args[1], 1.0, args[2]]).reshape(1, 4)
+    X = np.array([point[0], point[1], point[2], 1.0]).reshape(4, 1)
+    print A
+    print X
+    upper = np.dot(A, X)
+    print "upper", upper
+    print 'a', A[:, 0:3]
+    lower = math.sqrt(np.dot(A[:, 0:3], (A[:, 0:3]).reshape(3,1)))
+    print "lower", lower
+    # lower = 1
+    e = float(abs(upper / lower))
+    return e
+
 if __name__ == '__main__':
     # arr = np.arange(9).reshape((3, 3))
     # print arr
@@ -78,3 +95,18 @@ if __name__ == '__main__':
     print np.linalg.norm(arr)
     arr = np.array([[1.0,1.0], [100.0, 100.0]])
     print np.linalg.norm(arr)
+    arr = np.array([1,2,3,4,5])
+    print arr[arr > 3]
+    a = np.array([[1, 1, 1, 0, 0, 0],
+                  [0, 1, 1, 1, 0, 0],
+                  [0, 1, 1, 1, 0, 0],
+                  [1, 1, 1, 0, 0, 0],
+                  [1, 1, 1, 1, 1, 0]])
+
+    b = np.ascontiguousarray(a).view(np.dtype((np.void, a.dtype.itemsize * a.shape[1])))
+    _, idx = np.unique(b, return_index=True)
+
+    unique_a = a[idx]
+    print unique_a
+
+    print belong_point([1.47701851e-11, -1.18233201e-11, -2.99883268e+01], [0, 0, -29.0])

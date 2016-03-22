@@ -167,7 +167,7 @@ def identifysurf(points, config, donorm = True, surfs = [], paint_when_end = Fal
         A = np.abs(np.array([surf.args[0], surf.args[1], -1, surf.args[2]]).reshape(1, 4))
         X = np.array([point[0], point[1], point[2], 1]).reshape(4, 1)
         upper = np.dot(A, X)[0,0]
-        lower = math.sqrt(np.dot(A[0:3], (A[0:3]).reshape(4,1)))
+        lower = math.sqrt(np.dot(A[:, 0:3], (A[:, 0:3]).reshape(3,1)))
         e = abs(upper / lower)
 
         # global PRINT_COUNT
